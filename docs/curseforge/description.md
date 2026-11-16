@@ -8,6 +8,12 @@ Find gear for your class, role and equipment slot and see where it drops: boss, 
 
 A gear finder for **WoW: Forever**. Pick a class, a role and a slot, and the list shows every dungeon and raid item that suits them, with the boss and instance it drops from. English, Deutsch.
 
+## Requirements
+- [AtlasLoot Classic Forever](https://www.curseforge.com/wow/addons/atlasloot-forever)
+- [DungeonJournal](https://www.curseforge.com/wow/addons/dungeonjournal)
+
+Install both. The loot tables come from AtlasLoot Classic Forever.
+
 ## Classes and roles
 - Each class has its own roles: Priest **Healer** and **Caster**; Paladin **Healer**, **Tank** and **Melee**; Druid **Healer**, **Caster**, **Tank** and **Melee**; and so on.
 - Items are filtered by their stats: an item must have a stat the role wants and none the role excludes. Casters never see attack power or defense items, tanks never see spell power or mana regen.
@@ -40,7 +46,7 @@ The minimap button, `/flf`, or Blizzard's addon compartment.
 Styled like the other Forever addons, with all Forever themes and their colours. With the Forever Themes addon installed, it follows the central theme.
 
 ## Data
-- The items and drop locations come from the dungeon and raid tables of **AtlasLoot Forever**, read while you play. AtlasLoot Forever must be installed; nothing is copied from it.
+- The items and drop locations come from the dungeon and raid tables of **AtlasLoot Classic Forever**, read while you play. Nothing is copied from it.
 - New Forever items that the server has not shown to anyone yet appear without stats.
 
 ## Commands
