@@ -65,6 +65,9 @@ M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
     { name = "Garr", npcID = 2, [2] = { { 1, 103 }, { 2, 104 }, { 3, 107 }, { 4, 106 }, { 5, 110 }, { 6, 111 },
         { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 }, { 12, 120 }, { 13, 121 }, { 14, 122 }, { 15, 123 }, { 16, 124 },
         { 17, 125 }, { 18, 126 }, { 19, 127 }, { 20, 207 } } },
+    { name = "Twins", npcID = { 3, 4 }, [2] = { { 1, 110 } } },
+    { name = "Horde Only Quest Rewards", ExtraList = true, [2] = { { 1, 102 } } },
+    { name = "Tier 1 Sets", ExtraList = true, IgnoreAsSource = true, [2] = { { 1, 201 } } },
 } }
 
 M.items[150] = item("Tailored Robe", 3, 58, 52, "INVTYPE_ROBE", 4, 1, { [HEAL] = 20, ITEM_MOD_INTELLECT_SHORT = 12 })
@@ -131,7 +134,15 @@ check("only once", again, "CLASSIC")
 section("Source")
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 26)
+check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 27)
+local twins
+for _, d in ipairs(Source.ByItem(110)) do if d.boss == "Twins" then twins = d end end
+check("several npc ids: the first", twins and twins.npcID, 3)
+local questList = false
+for _, d in ipairs(Source.Drops()) do
+    if d.boss == "Horde Only Quest Rewards" or d.boss == "Tier 1 Sets" then questList = true end
+end
+check("quest lists and sets are no drops", questList, false)
 check("instance name without the mark", Source.ByItem(102)[1].instance, "The Deadmines")
 check("Forever mark kept", Source.ByItem(102)[1].forever, true)
 check("name from the map", Source.ByItem(103)[1].instance, "Area2717")
@@ -304,6 +315,8 @@ check("compared with the worn one", Filter.Against(Rules.SLOT.SHOULDER, nil, "HE
 M.state.worn = { [13] = 114, [14] = 125 }
 check("trinkets: with the one with stats", Filter.Against(Rules.SLOT.TRINKET, nil, "HEAL").id, 114)
 check("empty slot: nothing", Filter.Against(Rules.SLOT.HEAD, nil, "HEAL"), nil)
+M.state.worn = { [13] = 114 }
+check("one trinket, the other slot empty: compared with nothing", Filter.Against(Rules.SLOT.TRINKET, nil, "HEAL"), nil)
 M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
 
 section("Rules")

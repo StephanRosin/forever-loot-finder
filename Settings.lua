@@ -101,7 +101,8 @@ end
 -- Everything back to its default; the language and the theme colours stay.
 function Settings.Reset()
     local old = ns.DB()
-    ForeverLootFinderDB = { language = old.language, theme = old.theme, themeColors = old.themeColors }
+    ForeverLootFinderDB = { language = old.language, theme = old.theme, themeColors = old.themeColors,
+        themeAdopted = old.themeAdopted }
     Settings.Changed(nil)
 end
 

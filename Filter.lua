@@ -42,6 +42,8 @@ end
 -- The weakest of the worn items with stats for a role; true third when all
 -- worn are effects only (an on-use trinket: nothing is surely better).
 local function weakest(role, wornList)
+    -- An empty ring or trinket slot: anything fills it.
+    if wornList.empty then return 0, 0, false, nil end
     local bestP, bestM, bestItem, unclear
     for _, worn in ipairs(wornList) do
         local p, m, effectOnly = wornFor(role, worn)
@@ -192,6 +194,7 @@ function Filter.Run(o)
             if keep and item.loaded and not Rules.HasStats(item.stats) and not item.otherStats
                 and #(item.effects or {}) == 0 then
                 keep, unknown = false, unknown + 1
+                item.loaded = nil -- read again next time: the stats may come later
             end
             local entry = keep and evaluate(item, o, slot)
             if entry then
@@ -210,7 +213,7 @@ function Filter.WornIn(slot, invSlot)
     local list = {}
     for _, inv in ipairs(invSlot and { invSlot } or slot.inv) do
         local worn = Items.Worn(inv)
-        if worn then list[#list + 1] = worn end
+        if worn then list[#list + 1] = worn else list.empty = true end
     end
     return list
 end

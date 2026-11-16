@@ -206,6 +206,7 @@ function Panel.Restyle()
     if not panel then return end
     local UI = ns.Window.UI
     ns.ThemeArt.StyleWindow(panel, panel.bar)
+    panel.map.none:SetText(L.NO_MAP)
     panel.title:ClearAllPoints()
     panel.title:SetPoint("LEFT", panel.bar, "LEFT", ns.ThemeArt.TextStart(TITLE_H) or PAD, 0)
     panel.title:SetPoint("RIGHT", panel.bar, "RIGHT", -TITLE_H, 0)

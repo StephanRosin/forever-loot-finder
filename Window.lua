@@ -370,15 +370,6 @@ local function newRow(parent)
     return row
 end
 
-local function roleBadges(entry)
-    local parts = {}
-    for _, r in ipairs(entry.roles) do
-        local c = ROLE_COLORS[r.role]
-        parts[#parts + 1] = ("|cff%02x%02x%02x%s|r"):format(c[1] * 255, c[2] * 255, c[3] * 255, L["ROLE_SHORT_" .. r.role])
-    end
-    return #parts > 0 and ("   " .. table.concat(parts, " ")) or ""
-end
-
 local function details(entry)
     local lines = {}
     for i, d in ipairs(entry.drops) do
@@ -406,18 +397,17 @@ local function fillRow(row, entry, open)
     local q = QUALITY[item.quality or 1] or QUALITY[1]
     row.icon:SetTexture(item.icon)
     paintEdges(row.iconEdges, q, 1)
-    row.name:SetText(item.name or ("item:" .. item.id))
+    row.name:SetText(item.name or L.LOADING)
     paintText(row.name, nil, item.loaded and q or colour("muted"))
     local d = entry.drops[1]
     local more = #entry.drops > 1 and ("  (+%d)"):format(#entry.drops - 1) or ""
     row.where:SetText(dropText(d) .. more .. (d.forever and ("  " .. L.NEW_MARK) or ""))
-    row.badges:SetText(roleBadges(entry))
+    row.badges:SetText("")
     row.value:SetText(statText(entry))
     paintText(row.value, entry.unclear and "muted" or "text")
     if entry.verdict then
         local up = entry.verdict == "UPGRADE"
-        local delta = entry.delta and entry.delta ~= 0 and (" %+d"):format(math.floor(entry.delta + 0.5)) or ""
-        row.verdict:SetText((up and L.UPGRADE or L.ALTERNATIVE) .. (up and delta or ""))
+        row.verdict:SetText(up and L.UPGRADE or L.ALTERNATIVE)
         paintText(row.verdict, nil, up and UP_COLOR or ALT_COLOR)
     else
         row.verdict:SetText("")
@@ -502,7 +492,7 @@ end
 local function build()
     frame = CreateFrame("Frame", "ForeverLootFinderWindow", UIParent)
     frame:SetSize(WIDTH, HEIGHT)
-    frame:SetPoint("CENTER")
+    frame:SetPoint("CENTER", UIParent, "CENTER", -167, 0) -- half the side panel: both fit on 16:9
     frame:SetFrameStrata("HIGH")
     frame:SetToplevel(true)
     frame:SetMovable(true)
@@ -539,7 +529,7 @@ local function build()
     frame.classMenu:SetPoint("TOPLEFT", frame.classChip, "BOTTOMLEFT", 0, -2)
     frame.roleChips = {}
     for _, role in ipairs(Rules.ROLES) do
-        frame.roleChips[role] = Chip(frame, L["ROLE_" .. role], function() return roles()[role] == true end,
+        frame.roleChips[role] = Chip(frame, function() return L["ROLE_" .. role] end, function() return roles()[role] == true end,
             function(v) setRole(role, v) end)
     end
     local box = CreateFrame("EditBox", "ForeverLootFinderSearch", frame)
@@ -575,7 +565,7 @@ local function build()
         local out = {}
         for _, f in ipairs(list) do
             local get, set = setting(f[1])
-            out[#out + 1] = Chip(frame, L[f[2]], get, set)
+            out[#out + 1] = Chip(frame, function() return L[f[2]] end, get, set)
         end
         return out
     end
@@ -664,7 +654,7 @@ local function paintWorn()
     w.link = item and item.link or nil
     w.icon:SetTexture(item and item.icon or Rules.SlotArt(slot))
     w.name:SetText(item and (item.name or "…") or L.EMPTY_SLOT)
-    if #list > 1 and list[2].name then w.name:SetText(item.name .. "  ·  " .. list[2].name) end
+    if #list > 1 and list[2].name then w.name:SetText((item.name or "…") .. "  ·  " .. list[2].name) end
     paintText(w.name, "muted")
     w.ilvl:SetText(item and item.ilvl and tostring(item.ilvl) or "")
     w.back:SetVertexColor(0, 0, 0, 0.25)
@@ -754,6 +744,7 @@ function Window.Restyle()
     paintEdges(frame.search.edges, colour("muted"), 0.45)
     paintEdges(frame.classMenu.edges, colour("accent"), 0.8)
     for _, chip in ipairs(chips) do chip:Relabel() end
+    frame.search.hint:SetText(L.SEARCH)
     ns.Panel.Restyle()
     Window.Relayout()
 end
@@ -773,7 +764,9 @@ function Window.IsShown() return frame ~= nil and frame:IsShown() end
 -- From the character window: that slot (and inventory slot), what is worn
 -- compared.
 function Window.OpenSlot(slotKey, invSlot)
-    state.slot, state.invSlot, state.offset, state.open = slotKey, invSlot, 0, nil
+    -- The own class and no search text: the list is about the slot's worn item.
+    state.slot, state.invSlot, state.offset, state.open, state.class = slotKey, invSlot, 0, nil, nil
+    if frame then frame.search:SetText("") end
     if not S("filterBetter") then Settings.Set("filterBetter", true) end
     Window.Open()
 end
@@ -802,4 +795,8 @@ Items.OnLoaded(function() if Window.IsShown() then Window.Update() end end)
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 events:RegisterEvent("PLAYER_LEVEL_UP")
+events:RegisterEvent("PLAYER_REGEN_ENABLED") -- the loot tables load once combat is over
 events:SetScript("OnEvent", function() if Window.IsShown() then Window.Update() end end)
+
+-- A language switch relabels the chips, the search hint and the panel.
+ns.Locale.OnChange(function() Window.Restyle() end)

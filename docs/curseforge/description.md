@@ -12,7 +12,7 @@ A gear finder for **WoW: Forever**. Pick a class, a role and a slot, and the lis
 - [AtlasLoot Classic Forever](https://www.curseforge.com/wow/addons/atlasloot-forever)
 - [DungeonJournal](https://www.curseforge.com/wow/addons/dungeonjournal)
 
-Install both. The boss drops come from AtlasLoot Classic Forever; the quest rewards, the dungeon entrances and the boss models from DungeonJournal.
+Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabled. The boss drops and the crafts come from AtlasLoot Classic Forever; the quest rewards, the dungeon entrances and the boss models from DungeonJournal.
 
 ## Classes and roles
 - Each class has its own roles: Priest **Healer** and **Caster**; Paladin **Healer**, **Tank** and **Melee**; Druid **Healer**, **Caster**, **Tank** and **Melee**; and so on. One role is looked at at a time, since healing and damage are measured differently.
@@ -21,7 +21,7 @@ Install both. The boss drops come from AtlasLoot Classic Forever; the quest rewa
 
 ## Filters
 - **Wearable now**: only items for your level and the armour types you have learned.
-- **Best armour type only**: body armour of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewellery and trinkets always count. Not shown for cloth wearers.
+- **Best armour only**: body armour of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewellery and trinkets always count. Not shown for cloth wearers.
 - **Dungeons**, **raids**, **quests** and **crafting**, each on or off. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
 - **Better than worn** compares every item with what you wear in its slot; **Alternatives** adds the ones about as good. What you wear is not listed.
@@ -54,7 +54,7 @@ Styled like the other Forever addons, with all Forever themes and their colours.
 - Items the client does not know yet (some new Forever items) are left out until it does; the footer counts them.
 
 ## Commands
-`/flf`
+`/flf` opens the finder, `/flf options` the options.
 
 ## Notes
 - Made for WoW: Forever 1.60.1 (Interface 16001).

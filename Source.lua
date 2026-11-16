@@ -84,6 +84,15 @@ local function dropRate(npcID, itemID)
     return ok and rate or nil
 end
 
+-- A table of set ids, not items: its table type is AtlasLoot's "Set" (the
+-- type numbers are per module, so by name).
+local function isSet(module, boss)
+    local get = boss.TableType and module.GetItemTableType
+    local ok, t = false, nil
+    if get then ok, t = pcall(get, module, boss.TableType) end
+    return ok and type(t) == "table" and t[1] == "Set"
+end
+
 -- One boss's items: every difficulty's list ({ position, itemID } pairs;
 -- strings are AtlasLoot's headers and icons).
 local function bossItems(boss, add)
@@ -104,15 +113,21 @@ function Source.ReadAtlasLoot(module)
             local instance, forever = instanceName(key, content)
             local raid = isRaid(module, content, key, names)
             for _, boss in ipairs(content.items) do
-                if type(boss) == "table" then
+                -- Set tables (set ids, not items) and the new dungeons' quest lists
+                -- ("Horde Only Quest Rewards": DungeonJournal has those, with the faction) are no drops.
+                local listOnly = type(boss) ~= "table" or boss.IgnoreAsSource or isSet(module, boss)
+                    or (boss.ExtraList and type(boss.name) == "string" and boss.name:find("Quest", 1, true) ~= nil)
+                if not listOnly then
                     local bossName, newBoss = cleanName(boss.name)
+                    -- Several creatures (Twin Emperors, Four Horsemen): the first stands for them.
+                    local npcID = type(boss.npcID) == "table" and boss.npcID[1] or boss.npcID
                     local seen = {}
                     bossItems(boss, function(id)
                         if seen[id] then return end
                         seen[id] = true
                         list[#list + 1] = { item = id, instance = instance, boss = bossName or "?",
-                            npcID = boss.npcID, raid = raid, forever = forever or newBoss,
-                            rate = dropRate(boss.npcID, id) }
+                            npcID = npcID, raid = raid, forever = forever or newBoss,
+                            rate = dropRate(npcID, id) }
                     end)
                 end
             end

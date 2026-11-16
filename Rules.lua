@@ -82,7 +82,7 @@ Rules.PROFILES = {
     RANGED = {
         weights = { RAP = 0.5, AP = 0.5, AGI = 1, HIT = 10, RHIT = 10, CRIT = 12, RCRIT = 12, INT = 0.2,
             STA = 0.2, MP5 = 0.5, DPS = 3 },
-        want = set({ "RAP", "AP", "AGI", "HIT", "RHIT", "CRIT", "RCRIT" }),
+        want = set({ "RAP", "AP", "AGI", "HIT", "RHIT", "CRIT", "RCRIT", "DPS" }),
         exclude = set({ "HEAL", "SPELLDMG", "SHIT", "SCRIT", "DEF", "PARRY", "BLOCK", "BLOCKVAL" }),
     },
 }

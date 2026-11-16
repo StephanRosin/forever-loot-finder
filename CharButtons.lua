@@ -55,6 +55,8 @@ end
 
 local function make(parent, slot, invSlot)
     local b = CreateFrame("Button", nil, parent)
+    -- Controller navigation would take it as one of the slots (blocked actions).
+    if SmartNavigation_MarkFrameIgnored then SmartNavigation_MarkFrameIgnored(b) end
     b:SetFrameLevel((parent:GetFrameLevel() or 1) + 5)
     b.ring = b:CreateTexture(nil, "BACKGROUND")
     b.ring:SetAllPoints()
