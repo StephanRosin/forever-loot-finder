@@ -67,7 +67,16 @@ for _, f in ipairs(tocFiles()) do
     if not ok then error(f .. ": " .. tostring(e)) end
 end
 M.Fire("ADDON_LOADED", ADDON)
+-- The hub (Forever Themes) is there: the first login wears its theme.
+local hubColor = LibForeverThemes.COLORS.PITWALL[2].id
+ForeverThemesHub = { Theme = function() return "PITWALL" end, Color = function() return hubColor end,
+    Follows = function() return false end }
 M.Fire("PLAYER_LOGIN")
+local adopted = ns.Themes.Current() .. "/" .. tostring(ns.Themes.Color())
+ns.Themes.Switch("CLASSIC")
+M.Fire("PLAYER_LOGIN")
+local again = ns.Themes.Current()
+ForeverThemesHub = nil
 M.RunTimers()
 
 local Rules, Filter, Source, Settings = ns.Rules, ns.Filter, ns.Source, ns.Settings
@@ -80,6 +89,10 @@ end
 local function run(over)
     return Filter.Run(Filter.Options(over))
 end
+
+section("Themes")
+check("first login wears the hub's theme", adopted, "PITWALL/" .. hubColor)
+check("only once", again, "CLASSIC")
 
 section("Source")
 check("loads AtlasLoot's module", Source.Load(), true)
@@ -239,7 +252,7 @@ section("No accidental globals")
 local allowed = { ForeverLootFinderDB = true, ForeverLootFinderChar = true, SLASH_FOREVERLOOTFINDER1 = true,
     SLASH_FOREVERLOOTFINDER2 = true, ForeverLootFinder_OnAddonCompartmentClick = true,
     ForeverLootFinder_OnAddonCompartmentEnter = true, ForeverLootFinder_OnAddonCompartmentLeave = true,
-    LibForeverThemes = true, ForeverThemes = true, ForeverLootFinderWindow = true, ForeverLootFinderSearch = true,
+    LibForeverThemes = true, ForeverThemes = true, ForeverThemesHub = true, ForeverLootFinderWindow = true, ForeverLootFinderSearch = true,
     ForeverLootFinderButton = true, ForeverLootFinderOptions = true, ForeverLootFinderOptionsScroll = true,
     ForeverLootFinderInterfacePanel = true, ForeverLootFinderInterfaceOpen = true }
 local stray = {}

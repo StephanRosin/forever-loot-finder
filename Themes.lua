@@ -136,3 +136,16 @@ function Themes.HasOthers() return #Lib.Others(ADDON) > 0 end
 function Themes.ApplyToAll()
     return Lib.ApplyToAll(ADDON, Themes.Current(), Themes.Color())
 end
+
+-- Once, on the first login: wear the hub's theme and colour. The hub lets an
+-- addon it sees for the first time follow only when it already wears them,
+-- so a fresh install would otherwise keep Classic as its own theme.
+ns.On("PLAYER_LOGIN", function()
+    local db, hub = ns.DB(), Lib.Hub()
+    if db.themeAdopted then return end
+    db.themeAdopted = true
+    local theme = hub and hub.Theme and hub.Theme()
+    if not (theme and Themes.Switch(theme)) then return end
+    local color = hub.Color and hub.Color()
+    if color then Themes.SetColor(color, theme) end
+end)
