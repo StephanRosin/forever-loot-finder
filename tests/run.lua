@@ -457,6 +457,8 @@ check("spell power tank set: not a warrior's", (Rules.ForRole("TANK", warder, "W
 local hitCaster = Rules.Stats({ ITEM_MOD_INTELLECT_SHORT = 10, ITEM_MOD_HIT_RATING_SHORT = 10 })
 check("hit for casters", (Rules.ForRole("CASTER", hitCaster, "MAGE")), true)
 check("spell power heals", Rules.Stats({ ITEM_MOD_SPELL_POWER_SHORT = 20 }).HEAL, 20)
+check("bonus armour read", select(3, Rules.Stats({ ITEM_MOD_EXTRA_ARMOR_SHORT = 93, RESISTANCE0_NAME = 200 })), 93)
+check("no bonus armour", select(3, Rules.Stats({ RESISTANCE0_NAME = 200 })), nil)
 check("label: warrior DPS", Rules.RoleLabelKey("WARRIOR", "MELEE"), "ROLE_DPS")
 check("label: priest DPS", Rules.RoleLabelKey("PRIEST", "CASTER"), "ROLE_DPS")
 check("label: druid melee DPS", Rules.RoleLabelKey("DRUID", "MELEE"), "ROLE_MELEE_DPS")

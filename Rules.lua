@@ -292,7 +292,9 @@ function Rules.Stats(raw)
     if type(sp) == "number" and not (raw.ITEM_MOD_SPELL_HEALING_DONE_SHORT or raw.ITEM_MOD_SPELL_HEALING_DONE) then
         stats.HEAL = (stats.HEAL or 0) + sp
     end
-    return stats, other
+    -- Armour beyond the item's base ("+93 Armor"): shown for bear tanks.
+    local bonus = raw and (raw.ITEM_MOD_EXTRA_ARMOR_SHORT or raw.ITEM_MOD_EXTRA_ARMOR)
+    return stats, other, type(bonus) == "number" and bonus > 0 and bonus or nil
 end
 
 Rules.SCHOOL_OF = { FIREDMG = "FIRE", FROSTDMG = "FROST", SHADOWDMG = "SHADOW", NATUREDMG = "NATURE",

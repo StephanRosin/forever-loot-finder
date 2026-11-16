@@ -409,7 +409,10 @@ local function fillRow(row, entry, open)
     local d = entry.drops[1]
     local more = #entry.drops > 1 and ("  (+%d)"):format(#entry.drops - 1) or ""
     row.where:SetText(dropText(d) .. more .. (d.forever and ("  " .. L.NEW_MARK) or ""))
-    row.badges:SetText("")
+    -- Bears live on armour: an item's bonus armour stands out.
+    local bonus = item.bonusArmor and currentClass() == "DRUID" and entry.roles[1] and entry.roles[1].role == "TANK"
+    row.badges:SetText(bonus and ("   " .. L.BONUS_ARMOR:format(item.bonusArmor)) or "")
+    paintText(row.badges, nil, UP_COLOR)
     row.value:SetText(statText(entry))
     paintText(row.value, entry.unclear and "muted" or "text")
     if entry.verdict then

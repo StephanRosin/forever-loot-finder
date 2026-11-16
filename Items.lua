@@ -77,7 +77,7 @@ function Items.Get(id)
     local name, link, quality, ilvl, reqLevel = full(id)
     if name then
         item.name, item.link, item.quality, item.ilvl, item.reqLevel = name, link, quality, ilvl, reqLevel or 0
-        item.stats, item.otherStats = stats(link)
+        item.stats, item.otherStats, item.bonusArmor = stats(link)
         item.effects = effects(id)
         item.loaded = true
     end
