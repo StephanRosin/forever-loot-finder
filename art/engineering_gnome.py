@@ -1,0 +1,394 @@
+# Engineering with a gnome: on a crate behind the bench a gnome tightens a big
+# nut on a brass gizmo with a wrench, pull by pull; the gear train turns on the
+# wall, the boiler pumps and puffs steam.
+import sys, os, math, random
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bpy
+from mathutils import Vector
+from lib import *
+from figures import rig, attach, ik, target, pose, shaped
+
+out, only = args()
+s = reset()
+random.seed(11)
+world((0.015, 0.02, 0.03), (0.03, 0.022, 0.015), 0.5)
+glow(threshold=1.0, size=6)
+TAU = 2 * math.pi
+
+
+def phase(f):
+    """0..1 through the loop. Keys run 0..41: motion blur samples a little before frame 1 and after 40."""
+    return ((f - 1) / FRAMES) % 1.0
+
+
+# --- Materials
+brass = painted("Brass", (0.3, 0.17, 0.04), (0.78, 0.55, 0.2), rough=0.32, metal=1.0, scale=10,
+                rim=(0.9, 0.7, 0.35), wear=(0.15, 0.09, 0.03), bump=0.06)
+copper = painted("Copper", (0.3, 0.09, 0.03), (0.75, 0.33, 0.15), rough=0.35, metal=1.0, scale=8,
+                 rim=(0.95, 0.55, 0.35), wear=(0.12, 0.2, 0.15), bump=0.08)
+iron = painted("Iron", (0.05, 0.05, 0.055), (0.22, 0.22, 0.24), rough=0.55, metal=0.9, scale=9,
+               rim=(0.35, 0.4, 0.5), bump=0.15)
+bench_m = wood("Bench", (0.03, 0.013, 0.006), (0.12, 0.058, 0.026), scale=1.6)
+wall_m = flagstone("Wall", (0.015, 0.015, 0.018), (0.055, 0.05, 0.05), scale=4.5, seam=(0.012, 0.01, 0.01))
+floor_m = flagstone("Floor", (0.025, 0.022, 0.02), (0.09, 0.075, 0.06), scale=3.0)
+glass_m = painted("GaugeFace", (0.75, 0.7, 0.55), (0.95, 0.9, 0.75), rough=0.4, scale=20, bump=0.05)
+black = painted("Ink", (0.01, 0.01, 0.01), (0.03, 0.03, 0.03), rough=0.5)
+red = painted("RedNeedle", (0.4, 0.02, 0.01), (0.8, 0.05, 0.02), rough=0.4)
+flame_m = emissive("Torch", (0.35, 0.6, 1.0), 40)
+spark_m = emissive("Spark", (0.75, 0.85, 1.0), 60)
+hot_m = emissive("HotSeam", (1.0, 0.45, 0.12), 12)
+bulb_m = emissive("Bulb", (1.0, 0.75, 0.35), 18)
+
+
+g_iron = painted("GIron", (0.05, 0.05, 0.055), (0.22, 0.22, 0.24), rough=0.55, metal=0.9, scale=9,
+                 rim=(0.35, 0.4, 0.5), bump=0.15, radial=True)
+hole_m = painted("HoleShadow", (0.01, 0.008, 0.006), (0.03, 0.02, 0.015), rough=0.9, radial=True)
+
+
+def gear(name, teeth, r, depth, loc, mat, holes=0):
+    """A spur gear facing the camera (axis along y); teeth trapezoids."""
+    pts = []
+    tooth = TAU / teeth
+    for i in range(teeth):
+        a = i * tooth
+        for da, rr in ((0.0, r - 0.06 * r), (0.18, r - 0.06 * r), (0.3, r + 0.08 * r), (0.62, r + 0.08 * r),
+                       (0.74, r - 0.06 * r), (1.0, r - 0.06 * r)):
+            if da == 1.0:
+                continue
+            aa = a + da * tooth
+            pts.append((rr * math.cos(aa), rr * math.sin(aa)))
+    g = profile(name, pts, depth)
+    # A fan from the centre: the same triangles under every tooth. Left to Blender, the
+    # big n-gon is split unevenly and its shading turns with the gear (a jump at the loop seam).
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(g.data)
+    bmesh.ops.poke(bm, faces=[f for f in bm.faces if len(f.verts) > 8])
+    bm.to_mesh(g.data)
+    bm.free()
+    g = setmat(smooth(g, bevel=0.004, angle=30), mat)
+    for p in g.data.polygons:  # the flat faces flat: smoothing across the fan draws rays
+        if abs(p.normal.y) > 0.9:
+            p.use_smooth = False
+    g.location = loc
+    setmat(smooth(add("cyl", name + "Hub", (0, 0, 0), (0.22 * r, 0.22 * r, depth * 0.9), (math.radians(90), 0, 0),
+                      vertices=24), bevel=0.004), g_iron).parent = g
+    for k in range(holes):
+        a = k * TAU / holes
+        setmat(add("cyl", name + "Hole", (0.58 * r * math.cos(a), -0.002, 0.58 * r * math.sin(a)),
+                   (0.18 * r, 0.18 * r, depth * 0.52), (math.radians(90), 0, 0), vertices=20),
+               hole_m).parent = g
+    return g
+
+
+def spin(g, turns_in_teeth, teeth, offset=0.0):
+    """Turns g by a whole number of teeth over the loop, so the loop is seamless."""
+    for f in range(0, FRAMES + 2):
+        a = offset + (f - 1) / FRAMES * turns_in_teeth * TAU / teeth
+        key(g, "rotation_euler", f, a, 1)
+    for fc in fcurves(g.animation_data.action):
+        for k in fc.keyframe_points:
+            k.interpolation = "LINEAR"
+
+
+# --- Room
+setmat(add("plane", "Floor", (0, 0, 0), (12, 12, 1)), floor_m)
+setmat(add("plane", "Wall", (0, 1.5, 3), (12, 3, 1), (math.radians(90), 0, 0)), wall_m)
+
+# --- Gear train on the wall: 24 -> 12 -> 18 teeth (pitch radii share one module)
+M = 0.034
+G = [(24, (-0.55, 1.44, 1.85), 4), (12, (-0.55 + M * 18, 1.44, 1.85), 0), (18, (0.0, 1.44, 1.85 - M * 15 - 0.0), 3)]
+# third gear meshes with the 12-tooth one: place it on a circle around that one
+c2 = Vector(G[1][1])
+a3 = math.radians(-60)
+c3 = c2 + Vector((math.cos(a3), 0, math.sin(a3))) * M * 15
+G[2] = (18, tuple(c3), 3)
+gears = []
+# Spinning parts take the radial ("turned") texture: object-space noise would turn with them and jump at the seam.
+g_brass = painted("GBrass", (0.3, 0.17, 0.04), (0.78, 0.55, 0.2), rough=0.32, metal=1.0, scale=10,
+                  rim=(0.9, 0.7, 0.35), wear=(0.15, 0.09, 0.03), bump=0.06, radial=True)
+g_copper = painted("GCopper", (0.3, 0.09, 0.03), (0.75, 0.33, 0.15), rough=0.35, metal=1.0, scale=8,
+                   rim=(0.95, 0.55, 0.35), wear=(0.12, 0.2, 0.15), bump=0.08, radial=True)
+mats = (g_brass, g_copper, g_brass)
+steel_w = painted("WSteel", (0.12, 0.13, 0.15), (0.45, 0.46, 0.5), rough=0.3, metal=1.0, scale=9, rim=(0.4, 0.45, 0.6))
+for (n, loc, holes), mat in zip(G, mats):
+    gears.append(gear("Gear%d" % n, n, M * n / 2, 0.05, loc, mat, holes))
+# 6 teeth a loop: a quarter turn of the 24 (4 holes), a third of the 18 (3 holes),
+# half of the 12 -- every wheel ends where its teeth AND holes look the same.
+spin(gears[0], 6, 24)
+spin(gears[1], -6, 12, offset=math.pi / 12)
+spin(gears[2], 6, 18, offset=math.pi / 18 + 0.1)
+for (n, loc, _) in G:  # axles into the wall
+    setmat(smooth(add("cyl", "Axle", (loc[0], 1.47, loc[2]), (0.02, 0.02, 0.05), (math.radians(90), 0, 0),
+                      vertices=12)), iron)
+# A mounting plate with rivets behind the train
+plate = setmat(smooth(add("cube", "Plate", (-0.25, 1.49, 1.75), (0.75, 0.01, 0.42)), bevel=0.01), iron)
+for x in (-0.95, 0.45):
+    for z in (1.38, 2.12):
+        setmat(smooth(add("sphere", "Rivet", (x, 1.475, z), (0.018, 0.012, 0.018), segments=12, ring_count=6)), brass)
+
+# --- The bench
+setmat(smooth(add("cube", "Top", (0, 0.1, 0.88), (1.25, 0.45, 0.05)), bevel=0.012), bench_m)
+for x in (-1.1, 1.1):
+    for y in (-0.25, 0.45):
+        setmat(smooth(add("cube", "Leg", (x, y, 0.42), (0.05, 0.05, 0.42)), bevel=0.01), bench_m)
+setmat(smooth(add("cube", "Shelf", (0, 0.15, 0.25), (1.1, 0.35, 0.02)), bevel=0.006), bench_m)
+TOP = 0.93
+
+# --- Boiler on the right: copper drum with brass bands, gauge, piston, whistle
+BX, BY = 0.6, 0.12
+setmat(smooth(add("cyl", "Boiler", (BX, BY, TOP + 0.3), (0.24, 0.24, 0.28), vertices=40), bevel=0.02), copper)
+setmat(smooth(add("sphere", "Dome", (BX, BY, TOP + 0.58), (0.24, 0.24, 0.12), segments=40, ring_count=16)), copper)
+for z in (TOP + 0.06, TOP + 0.3, TOP + 0.54):
+    setmat(smooth(add("torus", "Band", (BX, BY, z), (1, 1, 1), major_radius=0.245, minor_radius=0.012)), brass)
+    for k in range(16):
+        a = k * TAU / 16
+        setmat(add("sphere", "BRivet", (BX + 0.255 * math.cos(a), BY + 0.255 * math.sin(a), z), (0.008, 0.008, 0.008),
+                   segments=8, ring_count=4), brass)
+for x in (BX - 0.15, BX + 0.15):  # feet
+    setmat(smooth(add("cube", "Foot", (x, BY, TOP + 0.015), (0.04, 0.2, 0.015)), bevel=0.004), iron)
+# Fire box door with a glow
+setmat(smooth(add("cyl", "Door", (BX, BY - 0.235, TOP + 0.16), (0.07, 0.07, 0.012), (math.radians(90), 0, 0),
+                  vertices=24), bevel=0.003), iron)
+grate = emissive("Grate", (1.0, 0.35, 0.08), 6)
+for k in range(3):
+    setmat(add("cube", "Slot", (BX - 0.03 + 0.03 * k, BY - 0.249, TOP + 0.16), (0.008, 0.002, 0.04)), grate)
+fire_light = light("POINT", (BX, BY - 0.33, TOP + 0.16), 6, (1, 0.45, 0.15), 0.05)
+# Gauge
+GZ = TOP + 0.38
+gauge = setmat(smooth(add("cyl", "Gauge", (BX - 0.08, BY - 0.27, GZ), (0.075, 0.075, 0.02), (math.radians(90), 0, 0),
+                          vertices=32)), brass)
+setmat(add("cyl", "Face", (BX - 0.08, BY - 0.292, GZ), (0.064, 0.064, 0.002), (math.radians(90), 0, 0), vertices=32),
+       glass_m)
+for k in range(9):  # tick marks over a 240 degree arc
+    a = math.radians(210 - k * 30)
+    o = setmat(add("cube", "Tick", (BX - 0.08 + 0.052 * math.cos(a), BY - 0.295, GZ + 0.052 * math.sin(a)),
+                   (0.007 if k % 2 == 0 else 0.004, 0.001, 0.0015)), black)
+    o.rotation_euler = (0, -a, 0)
+setmat(add("cube", "Red", (BX - 0.08 + 0.05 * math.cos(math.radians(-15)), BY - 0.295,
+                           GZ + 0.05 * math.sin(math.radians(-15))), (0.01, 0.001, 0.003), (0, math.radians(15), 0)),
+       red)
+needle = bpy.data.objects.new("Needle", None)
+link(needle)
+needle.location = (BX - 0.08, BY - 0.298, GZ)
+nd = setmat(add("cube", "NeedleBar", (0.024, 0, 0), (0.026, 0.001, 0.002)), red)
+nd.parent = needle
+setmat(add("cyl", "Pin", (0, 0, 0), (0.007, 0.007, 0.003), (math.radians(90), 0, 0), vertices=12), brass).parent = needle
+for f in range(0, FRAMES + 2):
+    t = phase(f)
+    a = math.radians(40 + 22 * math.sin(2 * TAU * t) + 6 * math.sin(7 * TAU * t))
+    key(needle, "rotation_euler", f, -a, 1)
+# Piston: a cylinder on the dome, its rod and a crank wheel (two strokes a loop)
+setmat(smooth(add("cyl", "PCyl", (BX + 0.08, BY, TOP + 0.75), (0.05, 0.05, 0.1), vertices=24), bevel=0.006), brass)
+rod = setmat(smooth(add("cyl", "Rod", (0, 0, 0), (0.014, 0.014, 0.12), vertices=12)), iron)
+cap = setmat(smooth(add("cube", "Cross", (0, 0, 0.12), (0.04, 0.02, 0.012)), bevel=0.003), brass)
+cap.parent = rod
+for f in range(0, FRAMES + 2):
+    t = phase(f)
+    key(rod, "location", f, (BX + 0.08, BY, TOP + 0.9 + 0.05 * math.sin(2 * TAU * t)))
+# Whistle pipe and steam
+setmat(smooth(add("cyl", "Pipe", (BX - 0.1, BY + 0.02, TOP + 0.74), (0.015, 0.015, 0.1), vertices=12)), copper)
+setmat(smooth(add("cyl", "Whistle", (BX - 0.1, BY + 0.02, TOP + 0.88), (0.028, 0.028, 0.05), vertices=16), bevel=0.004),
+       brass)
+
+
+def steam_material(i):
+    m = bpy.data.materials.new("Steam%d" % i)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.remove(nt.nodes["Principled BSDF"])
+    vol = nt.nodes.new("ShaderNodeVolumePrincipled")
+    vol.inputs["Color"].default_value = (0.9, 0.9, 0.95, 1)
+    noise = nt.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 3
+    mul = nt.nodes.new("ShaderNodeMath"); mul.operation = "MULTIPLY"
+    nt.links.new(noise.outputs["Fac"], mul.inputs[0])
+    nt.links.new(mul.outputs[0], vol.inputs["Density"])
+    nt.links.new(vol.outputs[0], nt.nodes["Material Output"].inputs["Volume"])
+    return m, mul.inputs[1]
+
+
+for i in range(10):
+    o = add("ico", "Puff", (0, 0, 0), (0.05, 0.05, 0.05), subdivisions=3)
+    m, dens = steam_material(i)
+    setmat(smooth(o), m)
+    ph = i / 10
+    drift = Vector((random.uniform(-0.05, 0.08), random.uniform(-0.03, 0.03), 0))
+    for f in range(0, FRAMES + 2):
+        age = (phase(f) + ph) % 1.0
+        p = Vector((BX - 0.1, BY + 0.02, TOP + 0.95)) + drift * age * 4 + Vector((0, 0, 0.55 * age))
+        key(o, "location", f, p)
+        k = 0.4 + 2.2 * age
+        key(o, "scale", f, (k, k, k))
+        key(dens, "default_value", f, 2.0 * (1 - age) ** 1.5 * min(1, age * 8))
+
+# A half-built mechanical chicken (a gnome's pride) beside it
+ch = Vector((-0.82, 0.15, TOP))
+setmat(smooth(add("sphere", "Body", ch + Vector((0, 0, 0.17)), (0.12, 0.09, 0.1), segments=24, ring_count=12)), brass)
+setmat(smooth(add("sphere", "Head", ch + Vector((0.1, 0, 0.32)), (0.05, 0.045, 0.05), segments=16, ring_count=8)), brass)
+setmat(smooth(add("cone", "Beak", ch + Vector((0.16, 0, 0.32)), (0.02, 0.015, 0.03), (0, math.radians(90), 0),
+                  vertices=8, radius1=1, radius2=0, depth=1)), copper)
+setmat(smooth(add("cyl", "Neck", ch + Vector((0.07, 0, 0.25)), (0.015, 0.015, 0.06), (0, math.radians(30), 0),
+                  vertices=8)), iron)
+setmat(add("sphere", "Eye", ch + Vector((0.13, -0.04, 0.34)), (0.012, 0.006, 0.012), segments=8, ring_count=4),
+       emissive("Eye", (0.3, 1.0, 0.4), 10))
+for dx in (-0.03, 0.03):
+    setmat(smooth(add("cyl", "CLeg", ch + Vector((dx, 0, 0.04)), (0.008, 0.008, 0.05), vertices=8)), iron)
+crank = gear("Wind", 10, 0.035, 0.012, tuple(ch + Vector((-0.08, -0.1, 0.18))), g_copper)
+spin(crank, 5, 10)
+# --- The gizmo on the bench: a brass box with a dial, a big hex nut on top and a little gear at its side
+NX, NY = -0.3, 0.3
+NZ = TOP + 0.16
+setmat(smooth(add("cube", "Gizmo", (NX, NY, TOP + 0.07), (0.13, 0.11, 0.07)), bevel=0.012), brass)
+setmat(smooth(add("cyl", "Dial", (NX - 0.04, NY - 0.112, TOP + 0.07), (0.035, 0.035, 0.006), (math.radians(90), 0, 0),
+                  vertices=24)), glass_m)
+setmat(add("cube", "DialHand", (NX - 0.04, NY - 0.12, TOP + 0.08), (0.002, 0.001, 0.025)), red)
+setmat(smooth(add("cyl", "Collar", (NX, NY, TOP + 0.15), (0.05, 0.05, 0.012), vertices=24)), iron)
+nut = setmat(smooth(add("cyl", "Nut", (NX, NY, NZ), (0.045, 0.045, 0.022), vertices=6), bevel=0.004), g_iron)
+setmat(smooth(add("cyl", "Bolt", (NX, NY, NZ + 0.03), (0.018, 0.018, 0.02), vertices=16)), g_iron)
+side = gear("Side", 10, 0.05, 0.015, (NX + 0.145, NY, TOP + 0.075), g_copper)
+side.rotation_euler = (0, 0, math.radians(90))
+# Pull (frames 1-14 of 20) and quick return; the nut turns with each pull, 60 degrees: the hexagon looks the same.
+wrench = bpy.data.objects.new("Wrench", None)
+link(wrench)
+wrench.location = (NX, NY, NZ)
+setmat(smooth(add("torus", "WRing", (0, 0, 0), (1, 1, 1), major_radius=0.06, minor_radius=0.016, major_segments=6,
+                  minor_segments=8)), steel_w).parent = wrench
+setmat(smooth(add("cube", "WBar", (0, 0.2, 0), (0.018, 0.15, 0.01)), bevel=0.006), steel_w).parent = wrench
+setmat(smooth(add("cyl", "WGrip", (0, 0.36, 0), (0.024, 0.024, 0.07), (math.radians(90), 0, 0), vertices=14)),
+       red).parent = wrench
+for f in range(0, FRAMES + 2):
+    k, ph = divmod(f - 1, 20)
+    if ph < 14:
+        t = ph / 14
+        t = t * t * (3 - 2 * t)
+        a = -30 + 60 * t          # the pull
+        n = k * 60 + 60 * t
+    else:
+        t = (ph - 14) / 6
+        a = 30 - 60 * t           # back without the nut
+        n = k * 60 + 60
+    key(wrench, "rotation_euler", f, math.radians(-55 - a), 2)   # the handle out to his left, across the view
+    key(nut, "rotation_euler", f, math.radians(-n), 2)
+    key(side, "rotation_euler", f, math.radians(n * 2), 0)   # 10 teeth: 120 degrees a pull, still whole teeth
+
+# --- The gnome (his own make: a big head, long ears, goggles, a teal tuft, blue overalls) on a crate
+GX, GY, CRATE = NX + 0.02, 0.82, 0.5
+setmat(smooth(add("cube", "Crate", (GX, GY + 0.05, CRATE / 2), (0.26, 0.24, CRATE / 2)), bevel=0.015), bench_m)
+for z in (0.05, CRATE - 0.05):
+    setmat(smooth(add("cube", "Slat", (GX, GY - 0.195, z), (0.27, 0.012, 0.03)), bevel=0.004), bench_m)
+skin = painted("GSkin", (0.3, 0.13, 0.08), (0.85, 0.55, 0.42), rough=0.55, scale=7, bump=0.1, rim=(1.0, 0.7, 0.55))
+tuft = painted("Tuft", (0.0, 0.08, 0.07), (0.05, 0.6, 0.5), rough=0.6, scale=60, bump=1.2, stretch=(1, 1, 20),
+               rim=(0.4, 1.0, 0.85))
+overall = painted("Overall", (0.02, 0.05, 0.12), (0.08, 0.2, 0.42), rough=0.85, scale=30, bump=0.4)
+shirt = painted("GShirt", (0.15, 0.03, 0.02), (0.55, 0.12, 0.06), rough=0.85, scale=30, bump=0.4)
+boot = painted("GBoot", (0.02, 0.012, 0.008), (0.12, 0.07, 0.04), rough=0.5, scale=20, bump=0.3, rim=(0.3, 0.2, 0.12))
+eye_w = painted("EyeWhite", (0.7, 0.68, 0.64), (0.95, 0.94, 0.9), rough=0.2)
+iris = painted("Iris", (0.0, 0.05, 0.08), (0.05, 0.3, 0.45), rough=0.1)
+lens = painted("Lens", (0.05, 0.2, 0.25), (0.2, 0.6, 0.7), rough=0.05, metal=0.2, emission=(0.2, 0.7, 0.8), emit=0.3)
+J = {
+    "pelvis": ((0, 0, 0.32), (0.15, 0.13)), "belly": ((0, -0.02, 0.45), (0.17, 0.15)),
+    "chest": ((0, 0, 0.6), (0.17, 0.13)), "neck": ((0, 0, 0.69), (0.06, 0.06)), "top": ((0, 0, 0.76), (0.05, 0.05)),
+}
+for sx, sd in ((1, "L"), (-1, "R")):
+    J.update({"sh" + sd: ((0.17 * sx, 0, 0.63), (0.075, 0.075)), "el" + sd: ((0.25 * sx, -0.14, 0.52), (0.055, 0.055)),
+              "wr" + sd: ((0.1 * sx, -0.3, 0.56), (0.045, 0.045)),
+              "hip" + sd: ((0.08 * sx, 0, 0.29), (0.085, 0.085)), "kn" + sd: ((0.1 * sx, -0.03, 0.17), (0.07, 0.07)),
+              "an" + sd: ((0.1 * sx, 0, 0.05), (0.06, 0.06))})
+B = [("spine", "pelvis", "belly", None), ("chest", "belly", "chest", "spine"), ("neck", "chest", "neck", "chest"),
+     ("head", "neck", "top", "neck")]
+for sd in "LR":
+    B += [("clav." + sd, "chest", "sh" + sd, "chest"), ("upper." + sd, "sh" + sd, "el" + sd, "clav." + sd),
+          ("fore." + sd, "el" + sd, "wr" + sd, "upper." + sd),
+          ("hip." + sd, "pelvis", "hip" + sd, "spine"), ("thigh." + sd, "hip" + sd, "kn" + sd, "hip." + sd),
+          ("shin." + sd, "kn" + sd, "an" + sd, "thigh." + sd)]
+arm, body = rig("Gnome", J, B, overall, loc=(GX, GY, CRATE))
+body.data.materials.append(shirt)
+for p in body.data.polygons:
+    if p.center.z > CRATE + 0.5 and abs(p.center.x - GX) > 0.15:
+        p.material_index = 1   # sleeves
+
+
+def G(x, y, z):
+    return (GX + x, GY + y, CRATE + z)
+
+
+parts = [setmat(smooth(add("sphere", "Skull", G(0, -0.03, 0.88), (0.185, 0.175, 0.18), segments=32, ring_count=16)), skin),
+         setmat(smooth(add("sphere", "Nose", G(0, -0.22, 0.85), (0.045, 0.05, 0.045), segments=16, ring_count=8)), skin),
+         setmat(smooth(add("sphere", "Chin", G(0, -0.13, 0.76), (0.1, 0.08, 0.06), segments=20, ring_count=10)), skin)]
+for sx in (1, -1):
+    ear = add("cone", "Ear", G(0.27 * sx, 0.0, 0.93), (0.05, 0.025, 0.13), (0, math.radians(-68 * sx), 0), vertices=16,
+              radius1=1, radius2=0.05, depth=1)
+    parts.append(setmat(smooth(ear, subsurf=1), skin))
+    parts += [setmat(smooth(add("sphere", "EyeW", G(0.07 * sx, -0.19, 0.9), (0.04, 0.02, 0.045), segments=16,
+                                ring_count=8)), eye_w),
+              setmat(smooth(add("sphere", "Iris", G(0.068 * sx, -0.205, 0.895), (0.022, 0.01, 0.025), segments=12,
+                                ring_count=6)), iris),
+              setmat(smooth(add("cube", "Brow", G(0.075 * sx, -0.2, 0.96), (0.045, 0.015, 0.012),
+                                (0, math.radians(12 * sx), 0)), bevel=0.008), tuft),
+              # goggles pushed up on the forehead
+              setmat(smooth(add("torus", "GRim", G(0.065 * sx, -0.15, 1.02), (1, 1, 1), (math.radians(65), 0, 0),
+                                major_radius=0.042, minor_radius=0.012)), brass),
+              setmat(add("cyl", "GLens", G(0.065 * sx, -0.152, 1.02), (0.035, 0.035, 0.004), (math.radians(65), 0, 0),
+                         vertices=20), lens),
+              setmat(shaped("Moustache", G(0.05 * sx, -0.23, 0.81), (0.055, 0.025, 0.022),
+                            width=lambda t: 1.0, rot=(0, math.radians(-25 * sx), 0)), tuft)]
+parts.append(setmat(smooth(add("torus", "Strap", G(0, -0.02, 1.0), (1, 1, 1), (math.radians(-12), 0, 0),
+                               major_radius=0.18, minor_radius=0.01)), black))
+for k in range(7):  # a spiky teal tuft
+    a = (k - 3) * 0.28
+    parts.append(setmat(shaped("Spike", G(0.05 * math.sin(a), 0.03 + 0.02 * abs(k - 3), 1.08), (0.04, 0.035, 0.1),
+                               width=lambda t: 0.25 + 0.75 * (1 - t) / 2, segments=12, rings=10,
+                               rot=(math.radians(-20), a * 0.9, 0)), tuft))
+for o in parts:
+    attach(o, arm, "head")
+for sx, sd in ((1, "L"), (-1, "R")):
+    wr = Vector(J["wr" + sd][0]) + Vector((GX, GY, CRATE))
+    hand = setmat(smooth(add("sphere", "Hand", wr + Vector((0, -0.02, 0)), (0.042, 0.05, 0.04), segments=16, ring_count=8)),
+                  skin)
+    attach(hand, arm, "fore." + sd)
+    b = setmat(smooth(add("cube", "Boot", G(0.1 * sx, -0.06, 0.04), (0.065, 0.11, 0.045)), bevel=0.03, subsurf=1), boot)
+    attach(b, arm, "shin." + sd)
+for sx in (1, -1):  # overall buttons and straps
+    o = setmat(smooth(add("sphere", "Button", G(0.07 * sx, -0.15, 0.6), (0.016, 0.01, 0.016), segments=10, ring_count=5)),
+               brass)
+    attach(o, arm, "chest")
+belt = setmat(smooth(add("torus", "GBelt", G(0, -0.02, 0.4), (1, 0.9, 1), major_radius=0.17, minor_radius=0.018)), boot)
+attach(belt, arm, "spine")
+# Both hands on the wrench's grip; he leans into each pull and nods
+ik(arm, "fore.R", target("GripR", (0, 0.33, 0.02), wrench))
+ik(arm, "fore.L", target("GripL", (0, 0.4, 0.02), wrench))
+for base in (0, 20):
+    for f, a, tw in ((1, 0, 6), (8, 7, 0), (14, 9, -6), (17, 2, 0), (20, 0, 6)):
+        pose(arm, "chest", base + f, (math.radians(a), 0, math.radians(tw)))
+        pose(arm, "neck", base + f, (math.radians(-a), 0, math.radians(-tw * 0.5)))
+for b_ in ("chest", "neck"):
+    pose(arm, b_, 0, (0, 0, math.radians(6 if b_ == "chest" else -3)))
+    pose(arm, b_, 41, arm.pose.bones[b_].rotation_euler)
+
+
+# --- Clutter: wrench rack, a bulb on a cord, bolts on the bench
+for k, x in enumerate((0.95, 1.05, 1.15, 1.25)):
+    w = setmat(smooth(add("cube", "Wrench", (x, 1.47, 1.55), (0.012, 0.006, 0.14 + 0.03 * k)), bevel=0.003), iron)
+    setmat(smooth(add("torus", "WHead", (x, 1.47, 1.55 + 0.15 + 0.03 * k), (1, 0.5, 1), (math.radians(90), 0, 0),
+                      major_radius=0.025, minor_radius=0.008)), iron)
+setmat(smooth(add("cube", "Rack", (1.1, 1.48, 1.78), (0.22, 0.01, 0.015)), bevel=0.003), bench_m)
+for i in range(14):
+    setmat(smooth(add("cyl", "Bolt", (random.uniform(-0.2, 0.25), random.uniform(-0.25, 0.3), TOP + 0.008),
+                      (0.012, 0.012, 0.008), vertices=6)), iron)
+bulb = setmat(smooth(add("sphere", "Bulb", (0.15, 0.2, 2.25), (0.045, 0.045, 0.06), segments=16, ring_count=8)), bulb_m)
+setmat(smooth(add("cyl", "Cord", (0.15, 0.2, 2.6), (0.004, 0.004, 0.3), vertices=6)), black)
+setmat(smooth(add("cone", "Shade", (0.15, 0.2, 2.33), (0.12, 0.12, 0.06), vertices=24, radius1=1, radius2=0.25, depth=1)),
+       copper)
+bl = light("POINT", (0.15, 0.2, 2.2), 70, (1, 0.72, 0.38), 0.06)
+for f in range(0, FRAMES + 2):
+    t = phase(f)
+    key(bl.data, "energy", f, 70 + 5 * math.sin(3 * TAU * t))
+
+# --- Light and camera
+light("AREA", (-1.8, -2.4, 3.0), 105, (1.0, 0.82, 0.62), 2.0, target=(0, 0.2, 1.2))   # warm key
+light("AREA", (2.2, 1.0, 2.6), 220, (0.45, 0.55, 1.0), 1.5, target=(0, 0.3, 1.3))     # cool rim
+light("AREA", (1.8, -2.6, 1.3), 40, (0.6, 0.65, 0.85), 2.5, target=(0, 0.2, 1.0))     # fill
+camera((0.05, -1.75, 1.75), (-0.08, 0.45, 1.28), lens=36, dof=3.0)
+
+render(out, only, "engineering_gnome")
