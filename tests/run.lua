@@ -52,6 +52,9 @@ M.items = {
         { tip = { "Use: Increases damage done by Shadow spells by up to 80 for 20 sec." } }),
     [125] = item("Prayer Beads", 3, 52, 50, "INVTYPE_TRINKET", 4, 0, {},
         { tip = { "Use: Increases healing done by spells by up to 190 for 20 sec." } }),
+    [126] = item("Band of Shadows", 3, 62, 57, "INVTYPE_FINGER", 4, 0, { RESISTANCE5_NAME = 15, ITEM_MOD_HEALTH_REGEN_SHORT = 17 }),
+    [127] = item("Flame Band", 3, 61, 56, "INVTYPE_FINGER", 4, 0, {},
+        { tip = { "Equip: Increases damage done by Fire spells and effects by up to 24." } }),
 }
 -- 112: a new Forever item the client does not know.
 M.atlas.TheDeadmines = { name = "The Deadmines|TInterface\\ltn4:18|t", ContentType = 1, items = {
@@ -60,7 +63,7 @@ M.atlas.TheDeadmines = { name = "The Deadmines|TInterface\\ltn4:18|t", ContentTy
 M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
     { name = "Garr", npcID = 2, [2] = { { 1, 103 }, { 2, 104 }, { 3, 107 }, { 4, 106 }, { 5, 110 }, { 6, 111 },
         { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 }, { 12, 120 }, { 13, 121 }, { 14, 122 }, { 15, 123 }, { 16, 124 },
-        { 17, 125 } } },
+        { 17, 125 }, { 18, 126 }, { 19, 127 } } },
 } }
 
 -- Load the addon ---------------------------------------------------------------
@@ -110,7 +113,7 @@ check("only once", again, "CLASSIC")
 section("Source")
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped", #Source.Drops(), 20)
+check("headers skipped", #Source.Drops(), 22)
 check("instance name without the mark", Source.ByItem(102)[1].instance, "The Deadmines")
 check("Forever mark kept", Source.ByItem(102)[1].forever, true)
 check("name from the map", Source.ByItem(103)[1].instance, "Area2717")
@@ -169,6 +172,10 @@ got = ids(run({ slot = "TRINKET", class = "WARRIOR", roles = { MELEE = true } })
 check("melee: proc in", got[120] ~= nil, true)
 check("melee: attack power in", got[122] ~= nil, true)
 check("melee: spell use out", got[121], nil)
+got = ids(run({ slot = "FINGER" }))
+check("only resistances: out", got[126], nil)
+check("priest: fire spell ring out", got[127], nil)
+check("mage: fire spell ring in", ids(run({ slot = "FINGER", class = "MAGE", roles = { CASTER = true } }))[127] ~= nil, true)
 check("German words", ns.Rules.EffectRoles({ { kind = "USE", text = "Erhöht die Angriffskraft um 260." } }, "deDE").MELEE, true)
 check("no word: anyone", ns.Rules.EffectRoles({ { kind = "USE", text = "Deals 300 Nature damage." } }, "enUS"), nil)
 

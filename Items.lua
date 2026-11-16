@@ -77,7 +77,7 @@ function Items.Get(id)
     local name, link, quality, ilvl, reqLevel = full(id)
     if name then
         item.name, item.link, item.quality, item.ilvl, item.reqLevel = name, link, quality, ilvl, reqLevel or 0
-        item.stats = stats(link)
+        item.stats, item.otherStats = stats(link)
         item.effects = effects(id)
         item.loaded = true
     end
@@ -97,7 +97,7 @@ function Items.Worn(invSlot)
     Items.Request(item)
     -- The worn link may carry an enchant: its stats as worn.
     if item and item.loaded then
-        local worn = setmetatable({ link = link, stats = stats(link) }, { __index = item })
+        local worn = setmetatable({ link = link, stats = (stats(link)) }, { __index = item })
         return worn
     end
     return item

@@ -19,7 +19,8 @@ ns.Window = Window
 local Rules, Filter, Items = ns.Rules, ns.Filter, ns.Items
 local Lib = LibForeverThemes
 
-local WIDTH, HEIGHT, TITLE_H, PAD = 700, 640, 32, 12
+-- Wide enough for the widest theme and language (Console, Frost in German: 744 measured).
+local WIDTH, HEIGHT, TITLE_H, PAD = 780, 640, 32, 12
 local CHIP_H, CHIP_GAP, SLOT_SIZE = 22, 6, 32
 local ROW_H, ROW_GAP, DETAIL_LINE, ICON = 44, 4, 16, 34
 local FOOTER_H = 26

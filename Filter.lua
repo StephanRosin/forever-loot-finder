@@ -71,7 +71,9 @@ local function evaluate(item, o, slot)
         entry.unclear = true
     elseif not Rules.HasStats(stats) then
         entry.unclear = true
-        local serves = Rules.EffectRoles(item.effects, GetLocale())
+        -- Only stats no role weighs (resistances), and no effect: out.
+        if item.otherStats and #(item.effects or {}) == 0 then return nil end
+        local serves = Rules.EffectRoles(item.effects, GetLocale(), o.class)
         if serves then
             local any = false
             for _, role in ipairs(Rules.ROLES) do any = any or (o.roles[role] and serves[role]) or false end

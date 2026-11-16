@@ -213,13 +213,18 @@ function Rules.IsBestArmor(class, classID, subClassID, equipLoc, level)
 end
 
 -- An item's stats under the short names; nil stats give an empty table.
+-- Second: whether it has stats no role weighs (resistances, health per 5).
 function Rules.Stats(raw)
-    local stats = {}
+    local stats, other = {}, false
     for key, value in pairs(raw or {}) do
         local short = Rules.STAT_KEYS[(key:gsub("_SHORT$", ""))]
-        if short and type(value) == "number" then stats[short] = (stats[short] or 0) + value end
+        if short and type(value) == "number" then
+            stats[short] = (stats[short] or 0) + value
+        elseif type(value) == "number" and value ~= 0 then
+            other = true
+        end
     end
-    return stats
+    return stats, other
 end
 
 -- How an item serves a role: fits (has a wanted stat, no excluded one),
@@ -258,12 +263,25 @@ Rules.EFFECT_WORDS = {
         damage = "schaden",
     },
 }
+-- Spell schools, and which classes cast them: "damage done by Fire spells"
+-- serves casters of those classes only.
+Rules.SCHOOL_WORDS = {
+    enUS = { FIRE = "fire", FROST = "frost", SHADOW = "shadow", NATURE = "nature", ARCANE = "arcane", HOLY = "holy" },
+    deDE = { FIRE = "feuer", FROST = "frost", SHADOW = "schatten", NATURE = "natur", ARCANE = "arkan", HOLY = "heilig" },
+}
+Rules.CLASS_SCHOOLS = {
+    MAGE = { FIRE = true, FROST = true, ARCANE = true }, WARLOCK = { FIRE = true, SHADOW = true },
+    PRIEST = { SHADOW = true, HOLY = true }, DRUID = { NATURE = true, ARCANE = true },
+    SHAMAN = { NATURE = true, FIRE = true, FROST = true }, PALADIN = { HOLY = true },
+}
+
 -- A chance on hit comes from weapon blows.
 Rules.PROC_ROLES = { TANK = true, MELEE = true, RANGED = true }
 
 -- The roles an item's effects serve ({ HEAL = true, ... }), or nil when no
 -- word matched: a plain effect ("deals 300 nature damage") may serve anyone.
-function Rules.EffectRoles(effects, locale)
+-- A school the class does not cast leaves an empty set: it serves none.
+function Rules.EffectRoles(effects, locale, class)
     local words = Rules.EFFECT_WORDS[locale] or Rules.EFFECT_WORDS.enUS
     local roles, any = {}, false
     for _, e in ipairs(effects or {}) do
@@ -281,6 +299,12 @@ function Rules.EffectRoles(effects, locale)
             -- "Healing done by spells" serves healers, not casters (as healing items).
             if found.HEAL and found.CASTER and not (text:find(words.damage, 1, true) or text:find("mana", 1, true)) then
                 found.CASTER = nil
+            end
+            if found.CASTER and class then
+                local mine = Rules.CLASS_SCHOOLS[class] or {}
+                for school, w in pairs(Rules.SCHOOL_WORDS[locale] or Rules.SCHOOL_WORDS.enUS) do
+                    if text:find(w, 1, true) and not mine[school] then found.CASTER, any = nil, true end
+                end
             end
             for role in pairs(found) do roles[role], any = true, true end
         end
