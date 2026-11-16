@@ -30,7 +30,8 @@ M.items = {
     [104] = item("Robe of Healing", 4, 63, 58, "INVTYPE_ROBE", 4, 1,
         { [HEAL] = 33, [DMG] = 11, ITEM_MOD_INTELLECT_SHORT = 15, ITEM_MOD_SPIRIT_SHORT = 10, RESISTANCE0_NAME = 70 }),
     [105] = item("Agile Cloak", 3, 60, 55, "INVTYPE_CLOAK", 4, 1, { ITEM_MOD_AGILITY_SHORT = 10, ITEM_MOD_ATTACK_POWER_SHORT = 20 }),
-    [106] = item("Mystic Trinket", 3, 61, 50, "INVTYPE_TRINKET", 4, 0, {}),
+    [106] = item("Mystic Trinket", 3, 61, 50, "INVTYPE_TRINKET", 4, 0, {}, { tip = { "Use: Restores 500 health." } }),
+    [107 + 100] = item("Blank Spaulders", 4, 61, 60, "INVTYPE_SHOULDER", 4, 1, {}),
     [107] = item("Shadow Staff", 4, 65, 60, "INVTYPE_2HWEAPON", 2, 10, { [DMG] = 40, [HEAL] = 40, ITEM_MOD_INTELLECT_SHORT = 20 }),
     [108] = item("Leather Spirit Gloves", 3, 58, 50, "INVTYPE_HAND", 4, 2, { ITEM_MOD_SPIRIT_SHORT = 15 }),
     [109] = item("Robe of Tomorrow", 4, 70, 70, "INVTYPE_ROBE", 4, 1, { [HEAL] = 50 }),
@@ -63,7 +64,7 @@ M.atlas.TheDeadmines = { name = "The Deadmines|TInterface\\ltn4:18|t", ContentTy
 M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
     { name = "Garr", npcID = 2, [2] = { { 1, 103 }, { 2, 104 }, { 3, 107 }, { 4, 106 }, { 5, 110 }, { 6, 111 },
         { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 }, { 12, 120 }, { 13, 121 }, { 14, 122 }, { 15, 123 }, { 16, 124 },
-        { 17, 125 }, { 18, 126 }, { 19, 127 } } },
+        { 17, 125 }, { 18, 126 }, { 19, 127 }, { 20, 207 } } },
 } }
 
 M.items[150] = item("Tailored Robe", 3, 58, 52, "INVTYPE_ROBE", 4, 1, { [HEAL] = 20, ITEM_MOD_INTELLECT_SHORT = 12 })
@@ -130,7 +131,7 @@ check("only once", again, "CLASSIC")
 section("Source")
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 25)
+check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 26)
 check("instance name without the mark", Source.ByItem(102)[1].instance, "The Deadmines")
 check("Forever mark kept", Source.ByItem(102)[1].forever, true)
 check("name from the map", Source.ByItem(103)[1].instance, "Area2717")
@@ -159,7 +160,8 @@ check("plate: not wearable", got[103], nil)
 check("attack power cloak: excluded", got[105], nil)
 check("leather: not wearable", got[108], nil)
 check("level 70: not now", got[109], nil)
-check("unknown to the client counted", unknown, 1)
+check("unknown to the client counted (and one without any data)", unknown, 2)
+check("no stats, no effect: not listed", got[207], nil)
 check("drops of both places", #got[101].drops, 2)
 check("sorted by item level", list[1].item.ilvl, 66)
 check("only the kept unloaded one asked for", table.concat(M.requested, ","), "111")

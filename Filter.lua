@@ -168,6 +168,12 @@ function Filter.Run(o)
                     item.equipLoc, wearLevel))
                 and not (text and not (item.name and item.name:lower():find(text, 1, true)))
             if keep then Items.Request(item) end
+            -- Loaded, but neither stats nor an effect: the client does not know
+            -- the item yet (Forever's new crafts); it waits like an unknown one.
+            if keep and item.loaded and not Rules.HasStats(item.stats) and not item.otherStats
+                and #(item.effects or {}) == 0 then
+                keep, unknown = false, unknown + 1
+            end
             local entry = keep and evaluate(item, o, slot)
             if entry then
                 entry.drops = drops
