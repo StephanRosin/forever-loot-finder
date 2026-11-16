@@ -1,12 +1,12 @@
 **Summary**
 
-Find gear for your class, role and equipment slot and see where it drops: boss, instance and drop chance. From the character window, a search button on every slot lists the upgrades and alternatives to what you wear.
+Find gear for your class, role and equipment slot and see where it comes from: boss and drop chance, quest or profession. From the character window, a search button on every slot lists the upgrades and alternatives to what you wear.
 
 ---
 
 # Forever Loot Finder
 
-A gear finder for **WoW: Forever**. Pick a class, a role and a slot, and the list shows every dungeon and raid item that suits them, with the boss and instance it drops from. English, Deutsch.
+A gear finder for **WoW: Forever**. Pick a class, a role and a slot, and the list shows every dungeon and raid drop, quest reward and crafted item that suits them, with where to get it. English, Deutsch.
 
 ## Requirements
 - [AtlasLoot Classic Forever](https://www.curseforge.com/wow/addons/atlasloot-forever)
@@ -24,6 +24,7 @@ Install both. The boss drops come from AtlasLoot Classic Forever; the quest rewa
 - **Best armour type only**: body armour of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewellery and trinkets always count. Not shown for cloth wearers.
 - **Dungeons**, **raids**, **quests** and **crafting**, each on or off. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
+- **Better than worn** compares every item with what you wear in its slot; **Alternatives** adds the ones about as good. What you wear is not listed.
 - A **name search**.
 - All 15 **equipment slots** as paper-doll icons.
 - **Sort** by item level, quality or name.
@@ -39,7 +40,8 @@ Install both. The boss drops come from AtlasLoot Classic Forever; the quest rewa
 - Each row shows the item level, the value that matters for the role and an **Upgrade** or **Alternative** mark.
 - **Click** a row to see all its drop locations: boss and instance, with the drop chance when it is known.
 - A **panel** opens beside the list: the zone's map with the dungeon's entrance marked, and the boss as a 3D model you can turn (for a quest reward: the quest and who gives it). Raids have no entrance on the map yet.
-- **Shift-click** links the item in chat, **ctrl-click** tries it on, hovering shows the item tooltip.
+- **Hover** a row for the item's tooltip and, under it, what it gives or takes against what you wear, stat by stat (+14 Spirit, -7 Healing). Hover **Worn now** for the worn item's tooltip.
+- **Shift-click** links the item in chat, **ctrl-click** tries it on.
 
 ## Where to find it
 The minimap button, `/flf`, or Blizzard's addon compartment.
@@ -49,7 +51,7 @@ Styled like the other Forever addons, with all Forever themes and their colours.
 
 ## Data
 - The items and drop locations come from the dungeon and raid tables of **AtlasLoot Classic Forever**, the quest rewards, entrances and boss models from **DungeonJournal**, both read while you play. Nothing is copied from them.
-- New Forever items that the server has not shown to anyone yet appear without stats.
+- Items the client does not know yet (some new Forever items) are left out until it does; the footer counts them.
 
 ## Commands
 `/flf`
