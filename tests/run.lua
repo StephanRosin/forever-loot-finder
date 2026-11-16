@@ -296,6 +296,14 @@ check("role switched", next(Settings.Roles("PRIEST")), "CASTER")
 got = ids(run({ slot = "SHOULDER", better = true }))
 check("caster: more spell damage is", got[141] and got[141].verdict, "UPGRADE")
 Settings.SetRole("HEAL")
+local diff = Filter.Diff(M.items[141] and ns.Items.Get(141), ns.Items.Get(140))
+local parts = {}
+for _, d in ipairs(diff) do parts[#parts + 1] = ("%s%+d"):format(d.key, d.delta) end
+check("diff stat by stat", table.concat(parts, " "), "INT+2 HEAL-7 SPELLDMG+8")
+check("compared with the worn one", Filter.Against(Rules.SLOT.SHOULDER, nil, "HEAL").id, 140)
+M.state.worn = { [13] = 114, [14] = 125 }
+check("trinkets: with the one with stats", Filter.Against(Rules.SLOT.TRINKET, nil, "HEAL").id, 114)
+check("empty slot: nothing", Filter.Against(Rules.SLOT.HEAD, nil, "HEAL"), nil)
 M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
 
 section("Rules")
@@ -336,6 +344,13 @@ check("entries", #ns.Window.Entries() > 0, true)
 Settings.Set("filterBetter", false)
 buttons[5]:GetScript("OnClick")(buttons[5])
 check("from a slot: better on", Settings.Get("filterBetter"), true)
+local wornRow = ns.Window.Frame().worn
+wornRow:GetScript("OnEnter")(wornRow)
+check("worn row: its tooltip", wornRow.link ~= nil and GameTooltip:IsShown(), true)
+local row1 = ns.Window.Frame().list.rows[1]
+row1:GetScript("OnEnter")(row1)
+local seen = table.concat(GameTooltip._lines or {}, "|")
+check("row tooltip: compared with the worn", seen:find("Compared with Robe of Healing", 1, true) ~= nil, true)
 check("from a slot: that slot", ns.Window.State().slot, "CHEST")
 check("from a slot: its entries", ns.Window.Entries()[1].item.equipLoc:find("CHEST", 1, true) ~= nil
     or ns.Window.Entries()[1].item.equipLoc == "INVTYPE_ROBE", true)

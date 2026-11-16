@@ -347,6 +347,23 @@ local function newRow(parent)
         if not e then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetHyperlink(e.item.link or ("item:" .. e.item.id))
+        -- What it gives or takes against the worn one, stat by stat.
+        if e.slot and e.item.loaded then
+            local worn = Filter.Against(e.slot, state.slot and state.invSlot or nil, next(roles()))
+            GameTooltip:AddLine(" ")
+            if not worn then
+                GameTooltip:AddLine(L.COMPARE_EMPTY, 1, 0.82, 0)
+            else
+                GameTooltip:AddLine(L.COMPARE_WITH:format(worn.name or "?"), 1, 0.82, 0)
+                local diff = Filter.Diff(e.item, worn)
+                for _, d in ipairs(diff) do
+                    local up = d.delta > 0
+                    GameTooltip:AddLine(("%+d %s"):format(d.delta, L["STAT_" .. d.key]), up and 0.3 or 1, up and 0.9 or 0.35,
+                        up and 0.4 or 0.3)
+                end
+                if #diff == 0 then GameTooltip:AddLine(L.COMPARE_SAME, 0.7, 0.7, 0.7) end
+            end
+        end
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -471,6 +488,14 @@ local function buildWorn()
     w.ilvl = Text(w, 18, "title")
     w.ilvl:SetPoint("RIGHT", w, "RIGHT", -12, 0)
     paintText(w.ilvl, "muted")
+    w:EnableMouse(true)
+    w:SetScript("OnEnter", function(self)
+        if not self.link then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink(self.link)
+        GameTooltip:Show()
+    end)
+    w:SetScript("OnLeave", function() GameTooltip:Hide() end)
     frame.worn = w
 end
 
@@ -636,6 +661,7 @@ local function paintWorn()
     local list = Filter.WornIn(slot, state.invSlot)
     local item = list[1]
     w.label:SetText(L.WORN)
+    w.link = item and item.link or nil
     w.icon:SetTexture(item and item.icon or Rules.SlotArt(slot))
     w.name:SetText(item and (item.name or "…") or L.EMPTY_SLOT)
     if #list > 1 and list[2].name then w.name:SetText(item.name .. "  ·  " .. list[2].name) end

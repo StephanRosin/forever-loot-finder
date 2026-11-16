@@ -42,16 +42,35 @@ end
 -- The weakest of the worn items with stats for a role; true third when all
 -- worn are effects only (an on-use trinket: nothing is surely better).
 local function weakest(role, wornList)
-    local bestP, bestM, unclear
+    local bestP, bestM, bestItem, unclear
     for _, worn in ipairs(wornList) do
         local p, m, effectOnly = wornFor(role, worn)
         if effectOnly then
             unclear = true
         elseif not bestP or p < bestP then
-            bestP, bestM = p, m
+            bestP, bestM, bestItem = p, m, worn
         end
     end
-    return bestP or 0, bestM or 0, unclear and not bestP
+    return bestP or 0, bestM or 0, unclear and not bestP, bestItem or wornList[1]
+end
+
+-- The worn item an item of `slot` is compared with for `role` (the weaker of
+-- two rings or trinkets, or the one invSlot), nil when the slot is empty.
+function Filter.Against(slot, invSlot, role)
+    local _, _, _, item = weakest(role, Filter.WornIn(slot, invSlot))
+    return item
+end
+
+-- Stat by stat what item gives over worn: { { key, delta } } in a fixed order.
+local ORDER = { "STR", "AGI", "STA", "INT", "SPI", "HEAL", "SPELLDMG", "MP5", "SHIT", "SCRIT", "AP", "RAP", "FAP",
+    "HIT", "RHIT", "CRIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "ARMOR", "DPS" }
+function Filter.Diff(item, worn)
+    local a, b, list = item.stats or {}, worn and worn.stats or {}, {}
+    for _, k in ipairs(ORDER) do
+        local d = (a[k] or 0) - (b[k] or 0)
+        if d ~= 0 then list[#list + 1] = { key = k, delta = d } end
+    end
+    return list
 end
 
 function Filter.Verdict(points, main, wornPoints, wornMain)
