@@ -71,18 +71,25 @@ local function build(parent)
     local art = CreateFrame("Frame", nil, panel)
     art:SetSize(MAP_W, MODEL_H)
     art:SetPoint("TOPLEFT", panel.location, "BOTTOMLEFT", 0, -8)
-    art.tex = art:CreateTexture(nil, "ARTWORK")
-    art.tex:SetAllPoints()
+    -- Both sheets stay loaded side by side and only their alpha flips:
+    -- SetTexture to the other file each loop showed a black frame while it loaded.
+    art.sheets = {}
+    for i = 1, 2 do
+        art.sheets[i] = art:CreateTexture(nil, "ARTWORK")
+        art.sheets[i]:SetAllPoints()
+    end
     art.edges = UI.edges(art)
     art:SetScript("OnUpdate", function(self, elapsed)
         self.t = (self.t or 0) + elapsed
         local f = math.floor(self.t * ART_FPS) % ART_FRAMES
         if f == self.frame then return end
         self.frame = f
-        local sheet, k = math.floor(f / ART_PER), f % ART_PER
-        self.tex:SetTexture(ART_DIR .. self.name .. "_" .. (sheet + 1) .. ".png")
+        local sheet, k = math.floor(f / ART_PER) + 1, f % ART_PER
         local u, v = (k % 4) * 0.25, math.floor(k / 4) * 0.1875
-        self.tex:SetTexCoord(u, u + 0.25, v, v + 0.1875)
+        for i, tex in ipairs(self.sheets) do
+            tex:SetAlpha(i == sheet and 1 or 0)
+            if i == sheet then tex:SetTexCoord(u, u + 0.25, v, v + 0.1875) end
+        end
     end)
     art:Hide()
     panel.art = art
@@ -189,6 +196,9 @@ function Panel.Show(parent, entry, onClose)
     panel.who:ClearAllPoints()
     local artName = drop.craft and Panel.ArtFor(drop.prof)
     local art = panel.art
+    if artName and artName ~= art.name then
+        for i, tex in ipairs(art.sheets) do tex:SetTexture(ART_DIR .. artName .. "_" .. i .. ".png") end
+    end
     art.name, art.frame, art.t = artName, nil, 0
     art:SetShown(artName ~= nil)
     local above = artName and art or drop.craft and panel.location or panel.entrance
