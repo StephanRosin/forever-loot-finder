@@ -19,7 +19,7 @@ local MODEL_H = 230
 local MARKER = "Interface\\Minimap\\Dungeon"
 -- Rendered profession loops (art/*.py): 40 frames of 512x384 on two sheets
 -- of 4x5, played at 15 fps. Keyed by AtlasLoot's crafting table name prefix.
-local ART = { "Blacksmithing", "Tailoring", "Leatherworking", "Enchanting" }
+local ART = { "Blacksmithing", "Tailoring", "Leatherworking", "Enchanting", "Engineering" }
 local ART_DIR = "Interface\\AddOns\\" .. ADDON .. "\\Media\\Professions\\"
 local ART_FPS, ART_FRAMES, ART_PER = 15, 40, 20
 

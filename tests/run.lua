@@ -407,6 +407,7 @@ P.art:GetScript("OnUpdate")(P.art, 1.5)   -- frame 22: second sheet, k 2
 check("panel: both sheets loaded", P.art.sheets[2]._texture:match("Tailoring_2%.png$") ~= nil, true)
 check("panel: art plays into sheet 2", P.art.sheets[2]:GetAlpha() == 1 and P.art.sheets[1]:GetAlpha() == 0, true)
 check("art for a TBC table", ns.Panel.ArtFor("LeatherworkingBC"), "Leatherworking")
+check("art for engineering", ns.Panel.ArtFor("EngineeringBC"), "Engineering")
 check("no art for cooking", ns.Panel.ArtFor("Cooking"), nil)
 check("panel: reagents", P.whoDetail:GetText(), "6× Runecloth, 1× #14341")
 P.bar.close:GetScript("OnClick")(P.bar.close)

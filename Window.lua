@@ -157,6 +157,8 @@ local function currentClass()
     return class
 end
 
+local function ownClass() return currentClass() == select(2, UnitClass("player")) end
+
 local function className(class)
     local names = LOCALIZED_CLASS_NAMES_MALE
     return (names and names[class]) or L["CLASS_" .. class]
@@ -237,11 +239,21 @@ end
 -- ---------------------------------------------------------------------------
 local function paintSlots()
     local a = colour("accent")
+    local own = ownClass()
     for _, b in ipairs(frame.slots) do
         local on = state.slot == b.slot.key
-        paintEdges(b.edges, on and a or colour("muted"), on and 1 or 0.35)
-        b.icon:SetDesaturated(not on)
-        b.icon:SetAlpha(on and 1 or 0.7)
+        local dim = state.slot ~= nil and not on
+        -- The worn item's icon reads at a glance; the paper doll's grey outline only for an empty slot.
+        local worn = own and GetInventoryItemTexture and GetInventoryItemTexture("player", b.slot.inv[1])
+        b.icon:SetTexture(worn or Rules.SlotArt(b.slot))
+        b.icon:SetBlendMode(worn and "BLEND" or "ADD")   -- the outline art is dark grey; added it reads
+        b.icon:SetDesaturated(dim)
+        b.icon:SetAlpha(dim and 0.6 or 1)
+        paintEdges(b.edges, on and a or colour("muted"), on and 1 or 0.6)
+        b.glow:SetVertexColor(a[1], a[2], a[3], 0.6)
+        b.glow:SetShown(on)
+        b.mark:SetVertexColor(a[1], a[2], a[3], 1)
+        b.mark:SetShown(on)
     end
     local slot = state.slot and Rules.SLOT[state.slot]
     frame.slotName:SetText(slot and L["SLOT_" .. slot.key] or L.SLOT_ALL)
@@ -255,10 +267,19 @@ local function buildSlots(y)
         local b = CreateFrame("Button", nil, frame)
         b:SetSize(SLOT_SIZE, SLOT_SIZE)
         b:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + (i - 1) * (SLOT_SIZE + gap), y)
+        -- Selected: an accent halo behind, the icon inset in it, a bar under it.
+        b.glow = fill(b, "BACKGROUND")
+        b.glow:SetPoint("TOPLEFT", -3, 3); b.glow:SetPoint("BOTTOMRIGHT", 3, -3)
+        b.back = fill(b, "BACKGROUND", 1)   -- the halo stays a ring; added outline art needs a dark ground
+        b.back:SetPoint("TOPLEFT", 1, -1); b.back:SetPoint("BOTTOMRIGHT", -1, 1)
+        b.back:SetVertexColor(0, 0, 0, 1)
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetPoint("TOPLEFT", 1, -1); b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
-        b.icon:SetTexture(Rules.SlotArt(slot))
+        b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
         b.edges = edges(b)
+        b.mark = fill(b, "OVERLAY")
+        b.mark:SetHeight(3)
+        b.mark:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, -3); b.mark:SetPoint("TOPRIGHT", b, "BOTTOMRIGHT", 0, -3)
         b.slot = slot
         b:SetScript("OnClick", function()
             state.slot = state.slot ~= slot.key and slot.key or nil
@@ -683,8 +704,6 @@ function Window.Relayout()
 end
 
 -- Another class is compared with nothing: the worn gear is the player's.
-local function ownClass() return currentClass() == select(2, UnitClass("player")) end
-
 local function wornShown()
     return ownClass() and S("filterBetter") and state.slot ~= nil
 end
