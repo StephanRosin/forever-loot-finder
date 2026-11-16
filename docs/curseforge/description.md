@@ -17,13 +17,13 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 ## Classes and roles
 - Each class has its own roles: Priest **Healer** and **DPS**; Paladin **Healer**, **Tank** and **DPS**; Druid **Healer**, **Caster DPS**, **Tank** and **Melee DPS**; Shaman **Healer**, **Caster DPS** and **Melee DPS**; Warrior **Tank** and **DPS**; Hunter, Rogue, Mage and Warlock **DPS**. One role is looked at at a time, since each is measured differently.
 - Items are judged by their stats, with weights per class and role: an item must have a stat the role wants and none the role excludes. Casters never see attack power or defense items, tanks never see spell power (except paladin tank sets).
-- Tanks get their heaviest armour type preselected and no two-handers (bears excepted); damage roles get no defense, dodge, parry or block items.
-- Bear tanks count armour, stamina, agility, defense and dodge, but no parry or block. School spell damage (fire, frost, shadow, ...) counts only for the classes that cast that school.
+- Tanks get their heaviest armor type preselected and no two-handers (bears excepted); damage roles get no defense, dodge, parry or block items.
+- Bear tanks count armor, stamina, agility, defense and dodge, but no parry or block. School spell damage (fire, frost, shadow, ...) counts only for the classes that cast that school.
 - Spell damage items count for healers too, since they carry the same healing. Healing items do not count for casters.
 
 ## Filters
-- **Wearable now**: only items for your level and the armour types you have learned.
-- **Best armour only**: body armour of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewellery and trinkets always count. Not shown for cloth wearers.
+- **Wearable now**: only items for your level and the armor types you have learned.
+- **Best armor only**: body armor of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewelry and trinkets always count. Not shown for cloth wearers.
 - **Dungeons**, **raids**, **quests** and **crafting**, each on or off. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
 - **Better than worn** compares every item with what you wear in its slot (only for your own class); **Alternatives** adds the ones about as good. What you wear is not listed.
@@ -50,7 +50,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 The minimap button, `/flf`, or Blizzard's addon compartment.
 
 ## Themes
-Styled like the other Forever addons, with all Forever themes and their colours. With the Forever Themes addon installed, it follows the central theme.
+Styled like the other Forever addons, with all Forever themes and their colors. With the Forever Themes addon installed, it follows the central theme.
 
 ## Data
 - The items and drop locations come from the dungeon and raid tables of **AtlasLoot Classic Forever**, the quest rewards, entrances and boss models from **DungeonJournal**, both read while you play. Nothing is copied from them.

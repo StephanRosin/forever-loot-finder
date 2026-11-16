@@ -338,8 +338,10 @@ local function newRow(parent)
     row.value = Text(row, 12, "text", false)
     row.value:SetPoint("RIGHT", row.verdict, "LEFT", -10, 0)
     row.value:SetJustifyH("RIGHT")
+    -- Marks (bonus armor, hit) right under the value, which moves up for them.
     row.badges = Text(row, 11, "text", false)
-    row.badges:SetPoint("TOPLEFT", row.where, "TOPRIGHT", 0, 0)
+    row.badges:SetPoint("TOPRIGHT", row.value, "BOTTOMRIGHT", 0, -1)
+    row.badges:SetJustifyH("RIGHT")
     row.details = {}
     for i = 1, 10 do
         local d = Text(row, 11, "text")
@@ -424,7 +426,8 @@ local function fillRow(row, entry, open)
     local marks = {}
     if bonus then marks[#marks + 1] = L.BONUS_ARMOR:format(item.bonusArmor) end
     if entry.hit then marks[#marks + 1] = L.HIT_MARK:format(entry.hit) end
-    row.badges:SetText(#marks > 0 and ("   " .. table.concat(marks, " · ")) or "")
+    row.badges:SetText(table.concat(marks, " · "))
+    row.value:SetPoint("RIGHT", row.verdict, "LEFT", -10, #marks > 0 and 7 or 0)
     paintText(row.badges, nil, UP_COLOR)
     row.value:SetText(statText(entry))
     paintText(row.value, entry.unclear and "muted" or "text")
