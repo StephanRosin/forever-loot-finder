@@ -28,6 +28,7 @@ local UPGRADE_SHARE, ALT_SHARE, UPGRADE_MIN = 1.05, 0.9, 0.5
 -- compared as it is), and its own stat.
 local function wornFor(role, worn)
     if not worn or not worn.loaded then return 0, 0 end
+    if not Rules.HasStats(worn.stats) then return 0, 0, true end
     local _, points, main = Rules.ForRole(role, worn.stats)
     if points == 0 then
         -- Out for the role (an excluded stat): weigh it all the same.
@@ -38,14 +39,19 @@ local function wornFor(role, worn)
     return points, main or 0
 end
 
--- The weakest of the worn items for a role.
+-- The weakest of the worn items with stats for a role; true third when all
+-- worn are effects only (an on-use trinket: nothing is surely better).
 local function weakest(role, wornList)
-    local bestP, bestM
+    local bestP, bestM, unclear
     for _, worn in ipairs(wornList) do
-        local p, m = wornFor(role, worn)
-        if not bestP or p < bestP then bestP, bestM = p, m end
+        local p, m, effectOnly = wornFor(role, worn)
+        if effectOnly then
+            unclear = true
+        elseif not bestP or p < bestP then
+            bestP, bestM = p, m
+        end
     end
-    return bestP or 0, bestM or 0
+    return bestP or 0, bestM or 0, unclear and not bestP
 end
 
 function Filter.Verdict(points, main, wornPoints, wornMain)
@@ -61,8 +67,16 @@ local RANK = { UPGRADE = 2, ALT = 1 }
 local function evaluate(item, o, slot)
     local stats = item.stats or {}
     local entry = { item = item, roles = {}, slot = slot }
-    if not item.loaded or not Rules.HasStats(stats) then
+    if not item.loaded then
         entry.unclear = true
+    elseif not Rules.HasStats(stats) then
+        entry.unclear = true
+        local serves = Rules.EffectRoles(item.effects, GetLocale())
+        if serves then
+            local any = false
+            for _, role in ipairs(Rules.ROLES) do any = any or (o.roles[role] and serves[role]) or false end
+            if not any then return nil end
+        end
     else
         for _, role in ipairs(Rules.ROLES) do
             if o.roles[role] then
@@ -78,8 +92,9 @@ local function evaluate(item, o, slot)
     else
         local wornList = o.worn(slot)
         for _, r in ipairs(entry.roles) do
-            local wp, wm = weakest(r.role, wornList)
+            local wp, wm, wornUnclear = weakest(r.role, wornList)
             r.verdict = Filter.Verdict(r.points, r.main, wp, wm)
+            if wornUnclear and r.verdict then r.verdict = "ALT" end
             r.delta = r.points - wp
             if r.verdict and (not entry.verdict or RANK[r.verdict] > RANK[entry.verdict]) then
                 entry.verdict, entry.delta = r.verdict, r.delta

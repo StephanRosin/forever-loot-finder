@@ -32,6 +32,29 @@ local function stats(link)
     return ns.Rules.Stats(fn and link and fn(link) or nil)
 end
 
+-- The tooltip's effect lines, the trigger cut off: { kind, text }.
+local TRIGGERS = { { "USE", "ITEM_SPELL_TRIGGER_ONUSE", "Use:" }, { "EQUIP", "ITEM_SPELL_TRIGGER_ONEQUIP", "Equip:" },
+    { "PROC", "ITEM_SPELL_TRIGGER_ONPROC", "Chance on hit:" } }
+local function effects(id)
+    local get = C_TooltipInfo and C_TooltipInfo.GetItemByID
+    local ok, data = false, nil
+    if get then ok, data = pcall(get, id) end
+    local list = {}
+    for _, line in ipairs(ok and data and data.lines or {}) do
+        local text = line.leftText
+        if type(text) == "string" then
+            for _, t in ipairs(TRIGGERS) do
+                local prefix = _G[t[2]] or t[3]
+                if text:sub(1, #prefix) == prefix then
+                    list[#list + 1] = { kind = t[1], text = (text:sub(#prefix + 1):gsub("^%s+", "")) }
+                    break
+                end
+            end
+        end
+    end
+    return list
+end
+
 local function request(id)
     if asked[id] then return end
     asked[id] = true
@@ -55,6 +78,7 @@ function Items.Get(id)
     if name then
         item.name, item.link, item.quality, item.ilvl, item.reqLevel = name, link, quality, ilvl, reqLevel or 0
         item.stats = stats(link)
+        item.effects = effects(id)
         item.loaded = true
     end
     return item

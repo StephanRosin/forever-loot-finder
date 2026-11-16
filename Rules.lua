@@ -238,6 +238,56 @@ function Rules.ForRole(role, stats)
     return fits, points, p.main and (stats[p.main] or 0) or nil
 end
 
+-- Effects ("Use:", "Equip:", "Chance on hit:") are text, not stats: words
+-- in them tell which roles they serve. Lower case, found as plain text.
+Rules.EFFECT_WORDS = {
+    enUS = {
+        HEAL = { "healing", "heals", "heal ", "mana" },
+        CASTER = { "spell", "magical", "mana" },
+        TANK = { "armor", "dodge", "parry", "block", "defense", "threat" },
+        MELEE = { "attack power", "melee", "weapon", "strength", "agility", "rage", "energy" },
+        RANGED = { "attack power", "ranged", "agility" },
+        damage = "damage",
+    },
+    deDE = {
+        HEAL = { "heil", "mana" },
+        CASTER = { "zauber", "magisch", "mana" },
+        TANK = { "rüstung", "ausweichen", "parier", "block", "verteidigung", "bedrohung" },
+        MELEE = { "angriffskraft", "nahkampf", "waffe", "stärke", "beweglichkeit", "wut", "energie" },
+        RANGED = { "angriffskraft", "distanz", "fernkampf", "beweglichkeit" },
+        damage = "schaden",
+    },
+}
+-- A chance on hit comes from weapon blows.
+Rules.PROC_ROLES = { TANK = true, MELEE = true, RANGED = true }
+
+-- The roles an item's effects serve ({ HEAL = true, ... }), or nil when no
+-- word matched: a plain effect ("deals 300 nature damage") may serve anyone.
+function Rules.EffectRoles(effects, locale)
+    local words = Rules.EFFECT_WORDS[locale] or Rules.EFFECT_WORDS.enUS
+    local roles, any = {}, false
+    for _, e in ipairs(effects or {}) do
+        if e.kind == "PROC" then
+            for role in pairs(Rules.PROC_ROLES) do roles[role] = true end
+            any = true
+        else
+            local text = e.text:lower()
+            local found = {}
+            for role, list in pairs(words) do
+                for _, w in ipairs(type(list) == "table" and list or {}) do
+                    if text:find(w, 1, true) then found[role] = true end
+                end
+            end
+            -- "Healing done by spells" serves healers, not casters (as healing items).
+            if found.HEAL and found.CASTER and not (text:find(words.damage, 1, true) or text:find("mana", 1, true)) then
+                found.CASTER = nil
+            end
+            for role in pairs(found) do roles[role], any = true, true end
+        end
+    end
+    return any and roles or nil
+end
+
 -- Whether the item has any stat a role could weigh (else: unclear, its
 -- effects are not stats, as a trinket's "Use:").
 function Rules.HasStats(stats)

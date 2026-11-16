@@ -262,7 +262,9 @@ end
 -- ---------------------------------------------------------------------------
 local function statText(entry)
     if entry.unclear then
-        return entry.item.loaded and L.NO_STATS or L.LOADING
+        if not entry.item.loaded then return L.LOADING end
+        local e = entry.item.effects and entry.item.effects[1]
+        return e and L["EFFECT_" .. e.kind] or L.NO_STATS
     end
     local r = entry.roles[1]
     local p = Rules.PROFILES[r.role]
@@ -319,7 +321,7 @@ local function newRow(parent)
     row.badges = Text(row, 11, "text", false)
     row.badges:SetPoint("TOPLEFT", row.where, "TOPRIGHT", 0, 0)
     row.details = {}
-    for i = 1, 6 do
+    for i = 1, 10 do
         local d = Text(row, 11, "text")
         d:SetPoint("TOPLEFT", row, "TOPLEFT", ICON + 18, -ROW_H - (i - 1) * DETAIL_LINE)
         d:SetPoint("TOPRIGHT", row, "TOPRIGHT", -12, -ROW_H - (i - 1) * DETAIL_LINE)
@@ -367,6 +369,11 @@ local function details(entry)
         lines[#lines + 1] = ("%s  %s"):format(d.raid and L.RAID or L.DUNGEON, dropText(d))
     end
     local item = entry.item
+    for i, e in ipairs(item.effects or {}) do
+        if i > 2 then break end
+        local text = L["EFFECT_" .. e.kind] .. ": " .. e.text
+        lines[#lines + 1] = #text > 90 and (text:sub(1, 88) .. " …") or text
+    end
     if item.loaded and item.reqLevel and item.reqLevel > 1 then lines[#lines + 1] = L.REQ_LEVEL:format(item.reqLevel) end
     lines[#lines + 1] = L.CLICK_HINT
     return lines

@@ -237,6 +237,15 @@ C_Item = {
     end,
     RequestLoadItemDataByID = function(id) M.requested[#M.requested + 1] = id end,
 }
+-- Tooltip lines: an item's `tip` list of left texts.
+C_TooltipInfo = { GetItemByID = function(id)
+    local it = M.items[id]
+    if not it then return nil end
+    local lines = { { leftText = it.name } }
+    for _, t in ipairs(it.tip or {}) do lines[#lines + 1] = { leftText = t } end
+    return { lines = lines }
+end }
+ITEM_SPELL_TRIGGER_ONUSE, ITEM_SPELL_TRIGGER_ONEQUIP, ITEM_SPELL_TRIGGER_ONPROC = "Use:", "Equip:", "Chance on hit:"
 function GetInventoryItemLink(_, slot)
     local id = M.state.worn[slot]
     return id and ("|Hitem:" .. id .. "|h[x]|h") or nil

@@ -40,6 +40,18 @@ M.items = {
     [113] = item("Better Robe", 4, 64, 60, "INVTYPE_ROBE", 4, 1,
         { [HEAL] = 40, ITEM_MOD_INTELLECT_SHORT = 15, ITEM_MOD_SPIRIT_SHORT = 10 }),
     [114] = item("Weak Trinket", 2, 40, 35, "INVTYPE_TRINKET", 4, 0, { [HEAL] = 5 }),
+    [120] = item("Heart of Fire", 3, 61, 55, "INVTYPE_TRINKET", 4, 0, {},
+        { tip = { "Chance on hit: Hurls a fiery ball that causes 286 to 376 Fire damage." } }),
+    [121] = item("Emblem of Spells", 4, 63, 60, "INVTYPE_TRINKET", 4, 0, {},
+        { tip = { "Use: Increases damage and healing done by magical spells and effects by up to 100 for 15 sec." } }),
+    [122] = item("Fury Badge", 3, 60, 55, "INVTYPE_TRINKET", 4, 0, {},
+        { tip = { "Use: Increases attack power by 260 for 20 sec." } }),
+    [123] = item("Lightning Bolts", 3, 60, 55, "INVTYPE_TRINKET", 4, 0, {},
+        { tip = { "Use: Blasts the enemy with lightning for 300 Nature damage." } }),
+    [124] = item("Shadow Charm", 3, 60, 55, "INVTYPE_TRINKET", 4, 0, {},
+        { tip = { "Use: Increases damage done by Shadow spells by up to 80 for 20 sec." } }),
+    [125] = item("Prayer Beads", 3, 52, 50, "INVTYPE_TRINKET", 4, 0, {},
+        { tip = { "Use: Increases healing done by spells by up to 190 for 20 sec." } }),
 }
 -- 112: a new Forever item the client does not know.
 M.atlas.TheDeadmines = { name = "The Deadmines|TInterface\\ltn4:18|t", ContentType = 1, items = {
@@ -47,7 +59,8 @@ M.atlas.TheDeadmines = { name = "The Deadmines|TInterface\\ltn4:18|t", ContentTy
 } }
 M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
     { name = "Garr", npcID = 2, [2] = { { 1, 103 }, { 2, 104 }, { 3, 107 }, { 4, 106 }, { 5, 110 }, { 6, 111 },
-        { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 } } },
+        { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 }, { 12, 120 }, { 13, 121 }, { 14, 122 }, { 15, 123 }, { 16, 124 },
+        { 17, 125 } } },
 } }
 
 -- Load the addon ---------------------------------------------------------------
@@ -97,7 +110,7 @@ check("only once", again, "CLASSIC")
 section("Source")
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped", #Source.Drops(), 14)
+check("headers skipped", #Source.Drops(), 20)
 check("instance name without the mark", Source.ByItem(102)[1].instance, "The Deadmines")
 check("Forever mark kept", Source.ByItem(102)[1].forever, true)
 check("name from the map", Source.ByItem(103)[1].instance, "Area2717")
@@ -138,6 +151,27 @@ check("healer: spell damage ring counts", got[102] ~= nil, true)
 check("healer: spell damage staff counts", got[107] ~= nil, true)
 check("healer: the role's value", got[102].roles[1].main, 20)
 
+section("Effects")
+check("effect lines read", M.items[120] and ns.Items.Get(120).effects[1].kind, "PROC")
+check("effect text without the trigger", ns.Items.Get(121).effects[1].text:sub(1, 9), "Increases")
+got = ids(run({ slot = "TRINKET" }))
+check("priest: weapon proc out", got[120], nil)
+check("priest: attack power use out", got[122], nil)
+check("priest: spell use in", got[121] ~= nil, true)
+check("priest: plain damage use in", got[123] ~= nil, true)
+got = ids(run({ slot = "TRINKET", roles = { HEAL = true } }))
+check("healer: shadow spells in? caster only", got[124], nil)
+check("healer: healing use in", got[125] ~= nil, true)
+got = ids(run({ slot = "TRINKET", roles = { CASTER = true } }))
+check("caster: healing use out", got[125], nil)
+check("caster: shadow spells in", got[124] ~= nil, true)
+got = ids(run({ slot = "TRINKET", class = "WARRIOR", roles = { MELEE = true } }))
+check("melee: proc in", got[120] ~= nil, true)
+check("melee: attack power in", got[122] ~= nil, true)
+check("melee: spell use out", got[121], nil)
+check("German words", ns.Rules.EffectRoles({ { kind = "USE", text = "Erhöht die Angriffskraft um 260." } }, "deDE").MELEE, true)
+check("no word: anyone", ns.Rules.EffectRoles({ { kind = "USE", text = "Deals 300 Nature damage." } }, "enUS"), nil)
+
 section("Warrior")
 got = ids(run({ class = "WARRIOR", roles = { TANK = true, MELEE = true } }))
 check("plate helm", got[103] ~= nil, true)
@@ -175,11 +209,18 @@ check("the worn one itself: alternative (as good)", got[104] and got[104].verdic
 got = ids(run({ slot = "CHEST", better = true, alternatives = false }))
 check("without alternatives", got[110], nil)
 got = ids(run({ slot = "TRINKET", better = true }))
-check("against the weaker trinket (no stats)", got[101] and got[101].delta, 35)
+check("against the worn trinket with stats", got[101] and got[101].delta, 30)
 got = ids(run({ slot = "TRINKET", better = true, invSlot = 14 }))
 check("against slot 14", got[101] and got[101].verdict, "UPGRADE")
 check("unclear trinket: alternative", got[106] and got[106].verdict, "ALT")
 check("empty slot: all upgrades", ids(run({ slot = "FINGER", better = true }))[102].verdict, "UPGRADE")
+M.state.worn = { [13] = 125, [14] = 125 }
+got = ids(run({ slot = "TRINKET", better = true, roles = { HEAL = true } }))
+check("worn on-use only: stat trinket at most alternative", got[101] and got[101].verdict, "ALT")
+M.state.worn = { [13] = 125, [14] = 114 }
+got = ids(run({ slot = "TRINKET", better = true, roles = { HEAL = true } }))
+check("one worn with stats: compared with that", got[101] and got[101].verdict, "UPGRADE")
+M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
 local up, alt = Filter.Count("CHEST", 5)
 check("count for the character window", up .. "/" .. alt, "1/2")
 check("verdict: equal points alternative", Filter.Verdict(10, nil, 10, 0), "ALT")
