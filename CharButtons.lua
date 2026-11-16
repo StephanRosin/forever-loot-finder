@@ -17,6 +17,7 @@ ns.CharButtons = CharButtons
 
 CharButtons.POINTS = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
 CharButtons.ICON = "Interface\\Common\\UI-Searchbox-Icon"
+local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 
 local buttons = {}
 
@@ -24,6 +25,7 @@ function CharButtons.Place()
     local size, point = S("charButtonSize"), S("charButtonPoint")
     for _, b in ipairs(buttons) do
         b:SetSize(size, size)
+        b.icon:SetSize(size * 0.62, size * 0.62)
         b:ClearAllPoints()
         b:SetPoint("CENTER", b:GetParent(), point, S("charButtonX"), S("charButtonY"))
         b:SetShown(S("charButtons"))
@@ -32,8 +34,10 @@ end
 
 local function paint(b, hover)
     local a = ns.Themes.Accent()
-    b.ring:SetVertexColor(a[1], a[2], a[3], hover and 1 or 0.85)
-    b.icon:SetVertexColor(hover and 1 or 0.9, hover and 1 or 0.9, hover and 1 or 0.9, 1)
+    b.ring:SetVertexColor(a[1], a[2], a[3], hover and 1 or 0.9)
+    b.disc:SetVertexColor(0.04, 0.05, 0.07, hover and 0.95 or 0.85)
+    local v = hover and 1 or 0.85
+    b.icon:SetVertexColor(v, v, v, 1)
 end
 
 local function onEnter(b)
@@ -58,13 +62,23 @@ local function make(parent, slot, invSlot)
     -- Controller navigation would take it as one of the slots (blocked actions).
     if SmartNavigation_MarkFrameIgnored then SmartNavigation_MarkFrameIgnored(b) end
     b:SetFrameLevel((parent:GetFrameLevel() or 1) + 5)
+    -- A round badge: an accent ring, a dark disc in it, the glass on top.
+    local function round(tex, inset)
+        tex:SetPoint("TOPLEFT", b, "TOPLEFT", inset, -inset)
+        tex:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -inset, inset)
+        local mask = b:CreateMaskTexture()
+        mask:SetAllPoints(tex)
+        mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        tex:AddMaskTexture(mask)
+    end
     b.ring = b:CreateTexture(nil, "BACKGROUND")
-    b.ring:SetAllPoints()
     b.ring:SetTexture("Interface\\Buttons\\WHITE8X8")
-    if b.ring.SetMask then b.ring:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") end
+    round(b.ring, 0)
+    b.disc = b:CreateTexture(nil, "BORDER")
+    b.disc:SetTexture("Interface\\Buttons\\WHITE8X8")
+    round(b.disc, 1)
     b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetPoint("TOPLEFT", b, "TOPLEFT", 2, -2)
-    b.icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -2, 2)
+    b.icon:SetPoint("CENTER", b, "CENTER", 0, 0)
     b.icon:SetTexture(CharButtons.ICON)
     b.slot, b.invSlot = slot, invSlot
     b:SetScript("OnEnter", onEnter)
