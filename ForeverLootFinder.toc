@@ -1,0 +1,30 @@
+## Interface: 16001
+## Title: Forever Loot Finder
+## Notes: Find gear for your class, role and slot, and where it drops; from the character window: better items for a slot.
+## Notes-deDE: Findet Ausrüstung für Klasse, Rolle und Slot und zeigt, wo sie droppt; aus dem Charakterfenster: bessere Items für einen Slot.
+## Version: 0.1.0
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_02
+## AddonCompartmentFunc: ForeverLootFinder_OnAddonCompartmentClick
+## OptionalDeps: AtlasLootClassic
+## SavedVariables: ForeverLootFinderDB
+## SavedVariablesPerCharacter: ForeverLootFinderChar
+
+Libs\LibForeverThemes\LibForeverThemes.lua
+Locales\enUS.lua
+Locales\deDE.lua
+Settings.lua
+Locale.lua
+Media.lua
+Options\Style.lua
+Themes.lua
+ThemeArt.lua
+Rules.lua
+Items.lua
+Source.lua
+Filter.lua
+Window.lua
+CharButtons.lua
+MinimapButton.lua
+Options\Widgets.lua
+Options\Window.lua
+Commands.lua

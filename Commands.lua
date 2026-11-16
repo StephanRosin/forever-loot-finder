@@ -1,0 +1,14 @@
+local ADDON, ns = ...
+local L = ns.L
+
+function ns.Print(text)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff4fc3f7" .. L.ADDON_NAME .. ":|r " .. tostring(text))
+end
+
+-- /flf: the finder; /flf options: the options.
+SLASH_FOREVERLOOTFINDER1 = "/flf"
+SLASH_FOREVERLOOTFINDER2 = "/foreverlootfinder"
+SlashCmdList.FOREVERLOOTFINDER = function(msg)
+    msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if msg == "options" or msg == "config" or msg == "optionen" then ns.Options.Toggle() else ns.Window.Toggle() end
+end

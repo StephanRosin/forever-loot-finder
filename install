@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Copy the addon into a WoW AddOns folder.
+#   ./install "<path to>/_forever_/Interface/AddOns"
+set -eu
+DEST="${1:?usage: ./install <AddOns folder>}"
+[ -d "$DEST" ] || { echo "Not a directory: $DEST" >&2; exit 1; }
+HERE="$(cd "$(dirname "$0")" && pwd)"
+TARGET="$DEST/ForeverLootFinder"
+rm -rf "$TARGET"
+mkdir -p "$TARGET"
+# Files listed in the TOC plus the TOC itself; nothing else ships.
+cp "$HERE/ForeverLootFinder.toc" "$TARGET/"
+grep -v '^\s*#' "$HERE/ForeverLootFinder.toc" | grep -v '^\s*$' | tr -d '\r' | while read -r f; do
+    f="${f//\\//}"
+    mkdir -p "$TARGET/$(dirname "$f")"
+    cp "$HERE/$f" "$TARGET/$f"
+done
+# The themes' textures and fonts (with their licence), in the embedded
+# LibForeverThemes.
+cp -r "$HERE/Libs/LibForeverThemes/Media" "$TARGET/Libs/LibForeverThemes/"
+echo "Installed to $TARGET"
