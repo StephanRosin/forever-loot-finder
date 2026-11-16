@@ -29,7 +29,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 - **Better than worn** compares every item with what you wear in its slot (only for your own class); **Alternatives** adds the ones about as good. What you wear is not listed.
 - **Hit items** (tanks only): also lists items with hit that no tank stat would bring in, and marks the hit of every item.
 - A **name search**.
-- All 15 **equipment slots** as paper-doll icons.
+- All 15 **equipment slots**, each showing the icon of what you wear there; the picked slot is framed and underlined.
 - **Sort** by item level, quality or name.
 
 ## From the character window
@@ -42,7 +42,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 ## The list
 - Each row shows the item level, the value that matters for the role and an **Upgrade** or **Alternative** mark.
 - **Click** a row to see all its drop locations: boss and instance, with the drop chance when it is known.
-- A **panel** opens beside the list: the zone's map with the dungeon's entrance marked, and the boss as a 3D model you can turn (for a quest reward: the quest and who gives it). Raids have no entrance on the map yet.
+- A **panel** opens beside the list: the zone's map with the dungeon's entrance marked, and the boss as a 3D model you can turn (for a quest reward: the quest and who gives it). Raids have no entrance on the map yet. For a crafted item the panel shows an animated scene of the profession instead: a forge, a sewing machine, a tanning rack, an enchanting altar or a gnomish workbench (made for this addon).
 - **Hover** a row for the item's tooltip and, under it, what it gives or takes against what you wear, stat by stat (+14 Spirit, -7 Healing). Hover **Worn now** for the worn item's tooltip.
 - **Shift-click** links the item in chat, **ctrl-click** tries it on.
 

@@ -12,4 +12,4 @@ for sheet in range(2):
         fr = Image.open(os.path.join(src, "%s_%02d.png" % (name, f))).convert("RGBA")
         assert fr.size == (W, H), fr.size
         img.paste(fr, ((k % COLS) * W, (k // COLS) * H))
-    img.save(os.path.join(out, "%s_%d.png" % (name, sheet + 1)), optimize=True)
+    img.save(os.path.join(out, "%s_%d.png" % (name.capitalize(), sheet + 1)), optimize=True)  # Panel.lua: "Tailoring_1.png"

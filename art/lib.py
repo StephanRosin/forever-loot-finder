@@ -174,7 +174,7 @@ def _principled(name):
 
 
 def painted(name, dark, light, rough=0.6, metal=0.0, scale=6.0, detail=8.0, rim=None, wear=None, bump=0.25,
-            emission=None, emit=0.0, coat=0.0, stretch=None):
+            emission=None, emit=0.0, coat=0.0, stretch=None, radial=False):
     """A hand-painted look: two tones broken up by noise, a lighter rim at
     grazing angles (the painted highlight WoW textures carry) and a bump."""
     m, nt, p = _principled(name)
@@ -185,6 +185,18 @@ def painted(name, dark, light, rough=0.6, metal=0.0, scale=6.0, detail=8.0, rim=
     noise.inputs["Detail"].default_value = detail
     noise.inputs["Roughness"].default_value = 0.62
     vec = tc.outputs["Object"]
+    if radial:  # turned metal: the pattern depends only on the distance from the y axis, so spinning parts loop
+        sep = N("ShaderNodeSeparateXYZ")
+        nt.links.new(vec, sep.inputs[0])
+        xz = N("ShaderNodeCombineXYZ")
+        nt.links.new(sep.outputs["X"], xz.inputs["X"])
+        nt.links.new(sep.outputs["Z"], xz.inputs["Z"])
+        ln = N("ShaderNodeVectorMath"); ln.operation = "LENGTH"
+        nt.links.new(xz.outputs[0], ln.inputs[0])
+        rv = N("ShaderNodeCombineXYZ")
+        nt.links.new(ln.outputs["Value"], rv.inputs["X"])
+        nt.links.new(sep.outputs["Y"], rv.inputs["Y"])
+        vec = rv.outputs[0]
     if stretch:  # streaks: bark ridges, brushed metal
         mp = N("ShaderNodeMapping")
         mp.inputs["Scale"].default_value = stretch

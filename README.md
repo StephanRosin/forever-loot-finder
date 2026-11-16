@@ -7,7 +7,8 @@ level, with where to get it. "Better than worn" compares each item with what you
 healing but more spirit). A search button on every slot of the character window opens the list for that slot.
 
 Clicking a row opens a panel beside the list: the zone's map with the dungeon's entrance marked and the boss as a
-3D model, or the quest and its giver, or the profession, skill and reagents. Hovering a row shows what it gives or
+3D model, or the quest and its giver, or the profession, skill and reagents under an animated
+scene of the profession. Hovering a row shows what it gives or
 takes against the worn item, stat by stat. Styled like the other Forever addons, registered with Forever Themes.
 English and German.
 
@@ -28,4 +29,6 @@ texts (words per role, spell schools per class). Items the client does not know 
     tests/run                    # Lua 5.1, as in the game
     ./install "<WoW>/_forever_/Interface/AddOns"
     tools/package                # dist/ForeverLootFinder-<version>.zip
+    blender -b --factory-startup -P art/<profession>.py -- <dir>   # 40 frames, 512x384 (Cycles)
+    python3 art/pack.py <dir> <profession> Media/Professions       # two 2048 sheets
     tools/release release "<changelog>"    # bump ## Version first; needs ## X-Curse-Project-ID in the TOC

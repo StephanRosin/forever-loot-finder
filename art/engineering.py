@@ -16,7 +16,7 @@ TAU = 2 * math.pi
 
 
 def phase(f):
-    """0..1 through the loop; frame 41 is frame 1 again (motion blur reads it)."""
+    """0..1 through the loop. Keys run 0..41: motion blur samples a little before frame 1 and after 40."""
     return ((f - 1) / FRAMES) % 1.0
 
 
@@ -39,6 +39,11 @@ hot_m = emissive("HotSeam", (1.0, 0.45, 0.12), 12)
 bulb_m = emissive("Bulb", (1.0, 0.75, 0.35), 18)
 
 
+g_iron = painted("GIron", (0.05, 0.05, 0.055), (0.22, 0.22, 0.24), rough=0.55, metal=0.9, scale=9,
+                 rim=(0.35, 0.4, 0.5), bump=0.15, radial=True)
+hole_m = painted("HoleShadow", (0.01, 0.008, 0.006), (0.03, 0.02, 0.015), rough=0.9, radial=True)
+
+
 def gear(name, teeth, r, depth, loc, mat, holes=0):
     """A spur gear facing the camera (axis along y); teeth trapezoids."""
     pts = []
@@ -51,21 +56,33 @@ def gear(name, teeth, r, depth, loc, mat, holes=0):
                 continue
             aa = a + da * tooth
             pts.append((rr * math.cos(aa), rr * math.sin(aa)))
-    g = setmat(smooth(profile(name, pts, depth), bevel=0.004, angle=30), mat)
+    g = profile(name, pts, depth)
+    # A fan from the centre: the same triangles under every tooth. Left to Blender, the
+    # big n-gon is split unevenly and its shading turns with the gear (a jump at the loop seam).
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(g.data)
+    bmesh.ops.poke(bm, faces=[f for f in bm.faces if len(f.verts) > 8])
+    bm.to_mesh(g.data)
+    bm.free()
+    g = setmat(smooth(g, bevel=0.004, angle=30), mat)
+    for p in g.data.polygons:  # the flat faces flat: smoothing across the fan draws rays
+        if abs(p.normal.y) > 0.9:
+            p.use_smooth = False
     g.location = loc
     setmat(smooth(add("cyl", name + "Hub", (0, 0, 0), (0.22 * r, 0.22 * r, depth * 0.9), (math.radians(90), 0, 0),
-                      vertices=24), bevel=0.004), iron).parent = g
+                      vertices=24), bevel=0.004), g_iron).parent = g
     for k in range(holes):
         a = k * TAU / holes
         setmat(add("cyl", name + "Hole", (0.58 * r * math.cos(a), -0.002, 0.58 * r * math.sin(a)),
                    (0.18 * r, 0.18 * r, depth * 0.52), (math.radians(90), 0, 0), vertices=20),
-               painted(name + "Shadow", (0.01, 0.008, 0.006), (0.03, 0.02, 0.015), rough=0.9)).parent = g
+               hole_m).parent = g
     return g
 
 
 def spin(g, turns_in_teeth, teeth, offset=0.0):
     """Turns g by a whole number of teeth over the loop, so the loop is seamless."""
-    for f in range(1, FRAMES + 2):
+    for f in range(0, FRAMES + 2):
         a = offset + (f - 1) / FRAMES * turns_in_teeth * TAU / teeth
         key(g, "rotation_euler", f, a, 1)
     for fc in fcurves(g.animation_data.action):
@@ -86,13 +103,19 @@ a3 = math.radians(-60)
 c3 = c2 + Vector((math.cos(a3), 0, math.sin(a3))) * M * 15
 G[2] = (18, tuple(c3), 3)
 gears = []
-mats = (brass, copper, brass)
+# Spinning parts take the radial ("turned") texture: object-space noise would turn with them and jump at the seam.
+g_brass = painted("GBrass", (0.3, 0.17, 0.04), (0.78, 0.55, 0.2), rough=0.32, metal=1.0, scale=10,
+                  rim=(0.9, 0.7, 0.35), wear=(0.15, 0.09, 0.03), bump=0.06, radial=True)
+g_copper = painted("GCopper", (0.3, 0.09, 0.03), (0.75, 0.33, 0.15), rough=0.35, metal=1.0, scale=8,
+                   rim=(0.95, 0.55, 0.35), wear=(0.12, 0.2, 0.15), bump=0.08, radial=True)
+mats = (g_brass, g_copper, g_brass)
 for (n, loc, holes), mat in zip(G, mats):
     gears.append(gear("Gear%d" % n, n, M * n / 2, 0.05, loc, mat, holes))
-# 24 turns 3 teeth a loop; meshing partners turn the same number of teeth the other way
-spin(gears[0], 3, 24)
-spin(gears[1], -3, 12, offset=math.pi / 12)
-spin(gears[2], 3, 18, offset=math.pi / 18 + 0.1)
+# 6 teeth a loop: a quarter turn of the 24 (4 holes), a third of the 18 (3 holes),
+# half of the 12 -- every wheel ends where its teeth AND holes look the same.
+spin(gears[0], 6, 24)
+spin(gears[1], -6, 12, offset=math.pi / 12)
+spin(gears[2], 6, 18, offset=math.pi / 18 + 0.1)
 for (n, loc, _) in G:  # axles into the wall
     setmat(smooth(add("cyl", "Axle", (loc[0], 1.47, loc[2]), (0.02, 0.02, 0.05), (math.radians(90), 0, 0),
                       vertices=12)), iron)
@@ -149,7 +172,7 @@ needle.location = (BX - 0.08, BY - 0.298, GZ)
 nd = setmat(add("cube", "NeedleBar", (0.024, 0, 0), (0.026, 0.001, 0.002)), red)
 nd.parent = needle
 setmat(add("cyl", "Pin", (0, 0, 0), (0.007, 0.007, 0.003), (math.radians(90), 0, 0), vertices=12), brass).parent = needle
-for f in range(1, FRAMES + 2):
+for f in range(0, FRAMES + 2):
     t = phase(f)
     a = math.radians(40 + 22 * math.sin(2 * TAU * t) + 6 * math.sin(7 * TAU * t))
     key(needle, "rotation_euler", f, -a, 1)
@@ -158,7 +181,7 @@ setmat(smooth(add("cyl", "PCyl", (BX + 0.08, BY, TOP + 0.75), (0.05, 0.05, 0.1),
 rod = setmat(smooth(add("cyl", "Rod", (0, 0, 0), (0.014, 0.014, 0.12), vertices=12)), iron)
 cap = setmat(smooth(add("cube", "Cross", (0, 0, 0.12), (0.04, 0.02, 0.012)), bevel=0.003), brass)
 cap.parent = rod
-for f in range(1, FRAMES + 2):
+for f in range(0, FRAMES + 2):
     t = phase(f)
     key(rod, "location", f, (BX + 0.08, BY, TOP + 0.9 + 0.05 * math.sin(2 * TAU * t)))
 # Whistle pipe and steam
@@ -189,7 +212,7 @@ for i in range(10):
     setmat(smooth(o), m)
     ph = i / 10
     drift = Vector((random.uniform(-0.05, 0.08), random.uniform(-0.03, 0.03), 0))
-    for f in range(1, FRAMES + 2):
+    for f in range(0, FRAMES + 2):
         age = (phase(f) + ph) % 1.0
         p = Vector((BX - 0.1, BY + 0.02, TOP + 0.95)) + drift * age * 4 + Vector((0, 0, 0.55 * age))
         key(o, "location", f, p)
@@ -215,7 +238,7 @@ setmat(add("sphere", "Eye", ch + Vector((0.13, -0.04, 0.34)), (0.012, 0.006, 0.0
        emissive("Eye", (0.3, 1.0, 0.4), 10))
 for dx in (-0.03, 0.03):
     setmat(smooth(add("cyl", "CLeg", ch + Vector((dx, 0, 0.04)), (0.008, 0.008, 0.05), vertices=8)), iron)
-crank = gear("Wind", 10, 0.035, 0.012, tuple(ch + Vector((-0.08, -0.1, 0.18))), copper)
+crank = gear("Wind", 10, 0.035, 0.012, tuple(ch + Vector((-0.08, -0.1, 0.18))), g_copper)
 spin(crank, 5, 10)
 # Torch nozzle pointing at the seam, flame flickering
 torch = bpy.data.objects.new("Torch", None)
@@ -227,14 +250,14 @@ setmat(smooth(add("cyl", "Grip", (0, 0, -0.3), (0.03, 0.03, 0.08), vertices=16))
 flame = setmat(add("cone", "Flame", (0, 0, 0.05), (0.014, 0.014, 0.1), vertices=12, radius1=1, radius2=0, depth=1),
                flame_m)
 flame.parent = torch
-for f in range(1, FRAMES + 2):
+for f in range(0, FRAMES + 2):
     t = phase(f)
     k = 1 + 0.15 * math.sin(6 * TAU * t) + 0.08 * math.sin(17 * TAU * t)
     key(flame, "scale", f, (1, 1, k))
 setmat(smooth(add("cyl", "Hose", (VX + 0.02, -0.45, TOP + 0.03), (0.012, 0.012, 0.25), (0, math.radians(90), 0),
                   vertices=8)), black)
 weld = light("POINT", (VX, -0.05, TOP + 0.27), 30, (0.55, 0.7, 1.0), 0.03)
-for f in range(1, FRAMES + 2):
+for f in range(0, FRAMES + 2):
     t = phase(f)
     key(weld.data, "energy", f, 30 + 14 * math.sin(9 * TAU * t) + 8 * math.sin(23 * TAU * t + 1))
 
@@ -251,7 +274,7 @@ for i in range(130):
         p = hit + v * speed * a + Vector((0, 0, -0.006 * a * a))
         p.z = max(p.z, TOP + 0.005)
         path.append(p)
-    for f in range(1, FRAMES + 2):
+    for f in range(0, FRAMES + 2):
         age = (f - 1 - born) % FRAMES
         if age <= LIFE:
             key(o, "location", f, path[age])
@@ -275,7 +298,7 @@ setmat(smooth(add("cyl", "Cord", (0.15, 0.2, 2.6), (0.004, 0.004, 0.3), vertices
 setmat(smooth(add("cone", "Shade", (0.15, 0.2, 2.33), (0.12, 0.12, 0.06), vertices=24, radius1=1, radius2=0.25, depth=1)),
        copper)
 bl = light("POINT", (0.15, 0.2, 2.2), 70, (1, 0.72, 0.38), 0.06)
-for f in range(1, FRAMES + 2):
+for f in range(0, FRAMES + 2):
     t = phase(f)
     key(bl.data, "energy", f, 70 + 5 * math.sin(3 * TAU * t))
 

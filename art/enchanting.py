@@ -64,7 +64,7 @@ for i in range(8):  # a rune on each face of the pillar
         o = setmat(add("cube", "PRune", d * 0.335 + Vector((0, 0, 0.62 + dz)), (w, 0.004, h)), rune_m)
         o.rotation_euler = (0, 0, a + math.pi / 2)
 
-# --- The rune circle on the altar top, turning one rune step a loop
+# --- The rune circle on the altar top, turning two rune steps (the hexagram's 60 degrees) a loop
 circle = bpy.data.objects.new("Circle", None)
 link(circle)
 circle.location = (0, 0, 1.06)
@@ -88,7 +88,7 @@ for i in range(6):  # a hexagram inside
 for o in parts:
     parent(o, circle)
 for f in (1, FRAMES + 1):
-    key(circle, "rotation_euler", f, (f - 1) / FRAMES * TAU / RUNES, 2)
+    key(circle, "rotation_euler", f, (f - 1) / FRAMES * 2 * TAU / RUNES, 2)  # 60 deg: glyphs and hexagram both repeat
 for fc in fcurves(circle.animation_data.action):
     for k in fc.keyframe_points:
         k.interpolation = "LINEAR"
