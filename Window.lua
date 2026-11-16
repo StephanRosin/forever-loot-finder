@@ -306,12 +306,12 @@ local function statText(entry)
         return e and L["EFFECT_" .. e.kind] or L.NO_STATS
     end
     local r = entry.roles[1]
-    local p = Rules.Profile(currentClass(), r.role)
-    if p.main and r.main and r.main > 0 then return L["VALUE_" .. p.main]:format(r.main) end
-    -- No own stat: the two that weigh most.
+    local p = r and Rules.Profile(currentClass(), r.role)
+    if p and p.main and r.main and r.main > 0 then return L["VALUE_" .. p.main]:format(r.main) end
+    -- No own stat: the two that weigh most (no role, a global search hit: the biggest).
     local best = {}
     for k, v in pairs(entry.item.stats) do
-        local w = (p.weights[k] or 0) * v
+        local w = (p and (p.weights[k] or 0) or 1) * v
         if w > 0 then best[#best + 1] = { k = k, v = v, w = w } end
     end
     table.sort(best, function(a, b) return a.w > b.w end)

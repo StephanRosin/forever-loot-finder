@@ -161,6 +161,9 @@ end
 function Filter.Run(o)
     local list, seen, unknown = {}, {}, 0
     local text = o.text and o.text ~= "" and o.text:lower() or nil
+    -- A search is global: every source, slot, class and role; only the name counts.
+    local global = text ~= nil
+    local plain = global and setmetatable({ better = false }, { __index = o }) or o
     local wearLevel = o.now and o.level or nil
     local wanted = o.slot and Rules.SLOT[o.slot]
     for _, drop in ipairs(ns.Source.Drops()) do
@@ -170,7 +173,9 @@ function Filter.Run(o)
             local drops = {}
             for _, d in ipairs(ns.Source.ByItem(id)) do
                 local wanted
-                if d.craft then
+                if global then
+                    wanted = true
+                elseif d.craft then
                     wanted = o.crafting
                 elseif d.quest then
                     wanted = o.quests and (not d.faction or d.faction == "Both" or d.faction == o.faction)
@@ -183,13 +188,13 @@ function Filter.Run(o)
             local item = #drops > 0 and Items.Instant(id) or nil
             if #drops > 0 and not item then unknown = unknown + 1 end
             -- The cheap checks first (equip location, class, armour type), the full item only then.
-            local slot = item and (wanted or Rules.SlotOf(item.equipLoc, o.class)) or nil
-            local keep = slot ~= nil and Rules.InSlot(slot, item.equipLoc, o.class)
+            local slot = item and (not global and wanted or Rules.SlotOf(item.equipLoc, o.class)) or nil
+            local keep = item ~= nil and global or slot ~= nil and Rules.InSlot(slot, item.equipLoc, o.class)
                 and Rules.CanWear(o.class, item.classID, item.subClassID, item.equipLoc, wearLevel)
                 and not (o.bestArmor and not Rules.IsBestArmor(o.class, item.classID, item.subClassID,
                     item.equipLoc, wearLevel))
             if keep then Items.Full(item) end
-            keep = keep and not (o.now and item.loaded and item.reqLevel > o.level)
+            keep = keep and not (not global and o.now and item.loaded and item.reqLevel > o.level)
                 and not (text and not (item.name and item.name:lower():find(text, 1, true)))
             if keep then Items.Request(item) end
             -- Loaded, but neither stats nor an effect: the client does not know
@@ -199,7 +204,7 @@ function Filter.Run(o)
                 keep, unknown = false, unknown + 1
                 item.loaded = nil -- read again next time: the stats may come later
             end
-            local entry = keep and evaluate(item, o, slot)
+            local entry = keep and (evaluate(item, plain, slot) or global and { item = item, roles = {}, slot = slot })
             if entry then
                 entry.drops = drops
                 list[#list + 1] = entry

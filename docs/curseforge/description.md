@@ -28,7 +28,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
 - **Better than worn** compares every item with what you wear in its slot (only for your own class); **Alternatives** adds the ones about as good. What you wear is not listed.
 - **Hit items** (tanks only): also lists items with hit that no tank stat would bring in, and marks the hit of every item.
-- A **name search**.
+- A **global name search**: typing a name searches every item, whatever the class, slot, role and source filters say.
 - All 15 **equipment slots**, each showing the icon of what you wear there; the picked slot is framed and underlined.
 - **Sort** by item level, quality or name.
 

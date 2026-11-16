@@ -2,7 +2,7 @@
 ## Title: Forever Loot Finder
 ## Notes: Find gear for your class, role and slot, and where it drops; from the character window: better items for a slot.
 ## Notes-deDE: Findet Ausrüstung für Klasse, Rolle und Slot und zeigt, wo sie droppt; aus dem Charakterfenster: bessere Items für einen Slot.
-## Version: 1.2.0
+## Version: 1.3.0
 ## X-Curse-Project-ID: 1809953
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_02
 ## AddonCompartmentFunc: ForeverLootFinder_OnAddonCompartmentClick

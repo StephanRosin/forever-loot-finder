@@ -35,7 +35,7 @@ L.CHAR_BUTTON_COUNT = "Upgrades: %d · Alternatives: %d"
 
 -- The finder
 
-L.SEARCH = "Name …"
+L.SEARCH = "Search all items …"
 L.FILTER_NOW = "Wearable now"
 L.FILTER_BEST_ARMOR = "Best armor only"
 L.FILTER_DUNGEONS = "Dungeons"

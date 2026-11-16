@@ -13,7 +13,7 @@ L.CHAR_BUTTON_TIP = "Bessere Items finden"
 L.CHAR_BUTTON_COUNT = "Upgrades: %d · Alternativen: %d"
 
 -- Der Finder
-L.SEARCH = "Name …"
+L.SEARCH = "Alle Items suchen …"
 L.FILTER_NOW = "Jetzt tragbar"
 L.FILTER_BEST_ARMOR = "Nur beste Rüstung"
 L.FILTER_DUNGEONS = "Dungeons"
