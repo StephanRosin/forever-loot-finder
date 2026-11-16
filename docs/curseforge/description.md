@@ -22,7 +22,7 @@ Install both. The boss drops come from AtlasLoot Classic Forever; the quest rewa
 ## Filters
 - **Wearable now**: only items for your level and the armour types you have learned.
 - **Best armour type only**: body armour of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewellery and trinkets always count. Not shown for cloth wearers.
-- **Dungeons**, **raids** and **quests**, each on or off. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
+- **Dungeons**, **raids**, **quests** and **crafting**, each on or off. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
 - A **name search**.
 - All 15 **equipment slots** as paper-doll icons.

@@ -23,6 +23,7 @@ Settings.DEFAULTS = {
     filterDungeons = true,
     filterRaids = true,
     filterQuests = true,
+    filterCrafting = true,
     filterBetter = false,       -- only better than (or alternatives to) what is worn
     filterAlternatives = true,  -- with "better": the unclear ones too
     sort = "ILVL",              -- Filter.SORTS

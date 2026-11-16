@@ -21,6 +21,7 @@ ns.Source = Source
 
 local drops, byItem, sourceName, journalByNpc
 local MODULE, CORE = "AtlasLootClassic_DungeonsAndRaids", "AtlasLootClassic"
+local CRAFT_MODULE = "AtlasLootClassic_Crafting"
 local QUEST_QUALITY = 3
 
 local function journal()
@@ -120,6 +121,34 @@ function Source.ReadAtlasLoot(module)
     return list
 end
 
+-- AtlasLoot's crafting tables: per profession its recipes as spell ids;
+-- prof (AtlasLoot.Data.Profession) gives { createdItem, profession, skill,
+-- low, high, reagents, counts } per spell. Items made, not spells.
+function Source.ReadCrafting(module, prof)
+    local list = {}
+    for key, content in pairs(module) do
+        if type(content) == "table" and type(content.items) == "table" then
+            local profName = cleanName(content.name)
+            profName = (profName and profName ~= "") and profName or key
+            local seen = {}
+            for _, section in ipairs(content.items) do
+                if type(section) == "table" then
+                    bossItems(section, function(spellID)
+                        local ok, data = pcall(prof.GetProfessionData, spellID)
+                        local made = ok and type(data) == "table" and data[1]
+                        if type(made) == "number" and not seen[made] then
+                            seen[made] = true
+                            list[#list + 1] = { item = made, instance = profName, craft = true, skill = data[3],
+                                spellID = spellID, reagents = data[6], counts = data[7], raid = false }
+                        end
+                    end)
+                end
+            end
+        end
+    end
+    return list
+end
+
 -- The journal's quest rewards of at least QUEST_QUALITY.
 function Source.ReadJournal(fdj)
     local list = {}
@@ -176,20 +205,24 @@ end
 -- else nil and why: "NONE" (no source addon), "COMBAT".
 function Source.Load()
     if drops then return true end
-    local module
+    local module, crafting
     if addonLoaded(CORE) then
-        if not addonLoaded(MODULE) then
+        if not (addonLoaded(MODULE) and addonLoaded(CRAFT_MODULE)) then
             if InCombatLockdown() then return nil, "COMBAT" end
-            loadAddon(MODULE)
+            if not addonLoaded(MODULE) then loadAddon(MODULE) end
+            if not addonLoaded(CRAFT_MODULE) then loadAddon(CRAFT_MODULE) end
         end
         local db = AtlasLoot and AtlasLoot.ItemDB and AtlasLoot.ItemDB.Storage
         module = db and db[MODULE]
+        local prof = AtlasLoot.Data and AtlasLoot.Data.Profession
+        crafting = db and db[CRAFT_MODULE] and prof and Source.ReadCrafting(db[CRAFT_MODULE], prof)
     end
     local fdj = journal()
     if not (module or fdj) then return nil, "NONE" end
     drops, byItem = module and Source.ReadAtlasLoot(module) or {}, {}
     local names = {}
     if module then names[#names + 1] = "AtlasLoot Classic Forever" end
+    for _, d in ipairs(crafting or {}) do drops[#drops + 1] = d end
     if fdj then
         for _, d in ipairs(Source.ReadJournal(fdj)) do drops[#drops + 1] = d end
         names[#names + 1] = "DungeonJournal"

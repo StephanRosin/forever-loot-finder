@@ -148,7 +148,9 @@ function Filter.Run(o)
             local drops = {}
             for _, d in ipairs(ns.Source.ByItem(id)) do
                 local wanted
-                if d.quest then
+                if d.craft then
+                    wanted = o.crafting
+                elseif d.quest then
                     wanted = o.quests and (not d.faction or d.faction == "Both" or d.faction == o.faction)
                         and (not d.classOnly or tostring(d.classOnly):upper() == o.class)
                 else
@@ -196,7 +198,7 @@ function Filter.Options(over)
     local o = {
         class = class, level = UnitLevel("player") or 60, roles = ns.Settings.Roles(class),
         now = S("filterNow"), bestArmor = S("filterBestArmor"), dungeons = S("filterDungeons"),
-        raids = S("filterRaids"), quests = S("filterQuests"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"),
+        raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"),
         sort = S("sort"), text = "",
     }
     for k, v in pairs(over or {}) do o[k] = v end

@@ -21,7 +21,6 @@ local Lib = LibForeverThemes
 
 -- Wide enough for the widest theme and language (Console, Frost in German: 744 measured).
 local WIDTH, HEIGHT, TITLE_H, PAD = 780, 640, 32, 12
-local SOURCE_GAP = 14
 local CHIP_H, CHIP_GAP, SLOT_SIZE = 22, 6, 32
 local ROW_H, ROW_GAP, DETAIL_LINE, ICON = 44, 4, 16, 34
 local FOOTER_H = 26
@@ -285,6 +284,7 @@ end
 
 local function dropText(d)
     if d.quest then return ("%s · %s"):format(L.QUEST_NAME:format(d.quest), d.instance) end
+    if d.craft then return L.CRAFT_NAME:format(d.instance, d.skill or 0) end
     local where = ("%s · %s"):format(d.boss, d.instance)
     if d.rate then where = where .. (" · %s %%"):format(d.rate) end
     return where
@@ -369,7 +369,7 @@ local function details(entry)
             lines[#lines + 1] = L.MORE_DROPS:format(#entry.drops - 4)
             break
         end
-        local line = d.quest and dropText(d) or ("%s  %s"):format(d.raid and L.RAID or L.DUNGEON, dropText(d))
+        local line = (d.quest or d.craft) and dropText(d) or ("%s  %s"):format(d.raid and L.RAID or L.DUNGEON, dropText(d))
         lines[#lines + 1] = line .. (d.choice and ("  (" .. L.QUEST_CHOICE .. ")") or "")
     end
     local item = entry.item
@@ -519,7 +519,7 @@ local function build()
     end
     local box = CreateFrame("EditBox", "ForeverLootFinderSearch", frame)
     box:SetSize(170, CHIP_H)
-    box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10 + CHIP_H + 8))
+    box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10))
     box:SetAutoFocus(false)
     box:SetTextInsets(22, 6, 0, 0)
     box.back = fill(box, "BACKGROUND")
@@ -555,23 +555,23 @@ local function build()
         return out
     end
     frame.sourceChips = chipsOf({ { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
-        { "filterQuests", "FILTER_QUESTS" } })
+        { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" } })
     frame.filterChips = chipsOf({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
         { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" } })
     frame.altChip = frame.filterChips[#frame.filterChips]
     frame.armorChip = frame.filterChips[2]
 
     -- Row 3: the slots, their name under them.
-    buildSlots(-(TITLE_H + 10 + 2 * (CHIP_H + 8)))
+    buildSlots(-(TITLE_H + 10 + 3 * (CHIP_H + 8)))
     frame.slotName = Text(frame, 12, "accent")
-    frame.slotName:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8) + SLOT_SIZE + 6))
+    frame.slotName:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -(TITLE_H + 10 + 3 * (CHIP_H + 8) + SLOT_SIZE + 6))
 
     -- Row 4: count and sort.
     frame.count = Text(frame, 14, "title")
     frame.count:SetPoint("TOPLEFT", frame.slotName, "BOTTOMLEFT", 0, -6)
     frame.sort = CreateFrame("Button", nil, frame)
     frame.sort:SetSize(140, 18)
-    frame.sort:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8) + SLOT_SIZE + 26))
+    frame.sort:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10 + 3 * (CHIP_H + 8) + SLOT_SIZE + 26))
     frame.sort.text = Text(frame.sort, 12, "accent")
     frame.sort.text:SetPoint("RIGHT")
     frame.sort.text:SetJustifyH("RIGHT")
@@ -597,7 +597,7 @@ end
 -- ---------------------------------------------------------------------------
 -- Updating
 -- ---------------------------------------------------------------------------
-local TOP_LIST = TITLE_H + 10 + 2 * (CHIP_H + 8) + SLOT_SIZE + 50
+local TOP_LIST = TITLE_H + 10 + 3 * (CHIP_H + 8) + SLOT_SIZE + 50
 
 -- Places what comes and goes: the role chips of the class, the worn row.
 function Window.Relayout()
@@ -612,12 +612,12 @@ function Window.Relayout()
         frame.roleChips[role]:SetShown(classRoles[role] == true)
         row1[#row1 + 1] = frame.roleChips[role]
     end
-    local x = flow(row1, frame, PAD, -(TITLE_H + 10))
-    flow(frame.sourceChips, frame, x + SOURCE_GAP, -(TITLE_H + 10))
+    flow(row1, frame, PAD, -(TITLE_H + 10))
+    flow(frame.sourceChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
     frame.altChip:SetShown(S("filterBetter"))
     -- Cloth wearers have one armour type: "best armour only" would change nothing.
     frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
-    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
+    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
     Window.Update()
 end
 
@@ -696,7 +696,7 @@ function Window.Update()
     frame.altChip:SetShown(S("filterBetter"))
     -- Cloth wearers have one armour type: "best armour only" would change nothing.
     frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
-    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
+    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
     paintSlots()
     paintWorn()
     local ok, why = ns.Source.Load()

@@ -270,6 +270,11 @@ M.addons = { AtlasLootClassic = true }
 C_AddOns = {
     IsAddOnLoaded = function(name) return M.addons[name] == true end,
     LoadAddOn = function(name)
+        if name == "AtlasLootClassic_Crafting" and M.addons.AtlasLootClassic then
+            M.addons[name] = true
+            AtlasLoot.ItemDB.Storage[name] = M.crafting
+            return true
+        end
         if name == "AtlasLootClassic_DungeonsAndRaids" and M.addons.AtlasLootClassic then
             M.addons[name] = true
             return true
@@ -286,6 +291,10 @@ AtlasLoot = {
     Data = { Droprate = { GetData = function(_, npc, item) return npc == 1 and item == 101 and 12.5 or nil end } },
 }
 M.atlas = module
+-- Crafting: a profession's recipes as spell ids; Profession data per spell.
+M.crafting = { Tailoring = { name = "Tailoring", items = { { name = "Robes", [1] = { { 1, 7001 }, { 2, 7002 } } } } } }
+M.professions = { [7001] = { 150, 8, 250, 260, 280, { 14047, 14341 }, { 6, 1 } } }
+AtlasLoot.Data.Profession = { GetProfessionData = function(id) return M.professions[id] end }
 
 -- The character window's slot buttons.
 for _, n in ipairs({ "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist", "Legs", "Feet",

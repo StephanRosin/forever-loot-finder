@@ -161,7 +161,25 @@ function Panel.Show(parent, entry, onClose)
     panel.location:SetText(place and place.location or (drop.raid and L.RAID or L.DUNGEON))
     showMap(place)
     local model = panel.model
-    if drop.quest then
+    panel.map:SetShown(not drop.craft)
+    panel.who:ClearAllPoints()
+    local above = drop.craft and panel.location or panel.entrance
+    panel.who:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -12)
+    panel.who:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -12)
+    if drop.craft then
+        panel.title:SetText(drop.instance)
+        panel.location:SetText(L.CRAFT_SKILL:format(drop.skill or 0))
+        panel.entrance:SetText("")
+        panel.who:SetText(L.REAGENTS)
+        local parts = {}
+        for i, id in ipairs(drop.reagents or {}) do
+            local name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(id)
+            if not name and C_Item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
+            parts[#parts + 1] = ("%d× %s"):format((drop.counts or {})[i] or 1, name or ("#" .. id))
+        end
+        panel.whoDetail:SetText(table.concat(parts, ", "))
+        model:Hide()
+    elseif drop.quest then
         panel.who:SetText(L.QUEST_NAME:format(drop.quest))
         panel.whoDetail:SetText(drop.giver and L.QUEST_GIVER:format(drop.giver) or "")
         model:Hide()
