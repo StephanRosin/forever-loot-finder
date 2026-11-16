@@ -26,27 +26,22 @@ local UPGRADE_SHARE, ALT_SHARE, UPGRADE_MIN = 1.05, 0.9, 0.5
 
 -- The points the worn item has for a role (fitting or not: a worn item is
 -- compared as it is), and its own stat.
-local function wornFor(role, worn)
+local function wornFor(role, worn, class)
     if not worn or not worn.loaded then return 0, 0 end
     if not Rules.HasStats(worn.stats) then return 0, 0, true end
-    local _, points, main = Rules.ForRole(role, worn.stats)
-    if points == 0 then
-        -- Out for the role (an excluded stat): weigh it all the same.
-        local p = Rules.PROFILES[role]
-        for k, v in pairs(worn.stats) do points = points + v * (p.weights[k] or 0) end
-        main = p.main and (worn.stats[p.main] or 0) or nil
-    end
+    -- Fitting the role or not (an excluded stat): weighed as it is.
+    local points, main = Rules.Points(role, worn.stats, class)
     return points, main or 0
 end
 
 -- The weakest of the worn items with stats for a role; true third when all
 -- worn are effects only (an on-use trinket: nothing is surely better).
-local function weakest(role, wornList)
+local function weakest(role, wornList, class)
     -- An empty ring or trinket slot: anything fills it.
     if wornList.empty then return 0, 0, false, nil end
     local bestP, bestM, bestItem, unclear
     for _, worn in ipairs(wornList) do
-        local p, m, effectOnly = wornFor(role, worn)
+        local p, m, effectOnly = wornFor(role, worn, class)
         if effectOnly then
             unclear = true
         elseif not bestP or p < bestP then
@@ -58,14 +53,15 @@ end
 
 -- The worn item an item of `slot` is compared with for `role` (the weaker of
 -- two rings or trinkets, or the one invSlot), nil when the slot is empty.
-function Filter.Against(slot, invSlot, role)
-    local _, _, _, item = weakest(role, Filter.WornIn(slot, invSlot))
+function Filter.Against(slot, invSlot, role, class)
+    local _, _, _, item = weakest(role, Filter.WornIn(slot, invSlot), class or select(2, UnitClass("player")))
     return item
 end
 
 -- Stat by stat what item gives over worn: { { key, delta } } in a fixed order.
 local ORDER = { "STR", "AGI", "STA", "INT", "SPI", "HEAL", "SPELLDMG", "MP5", "SHIT", "SCRIT", "AP", "RAP", "FAP",
-    "HIT", "RHIT", "CRIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "ARMOR", "DPS" }
+    "HIT", "RHIT", "CRIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "ARMOR", "DPS",
+    "FIREDMG", "FROSTDMG", "SHADOWDMG", "NATUREDMG", "ARCANEDMG", "HOLYDMG" }
 function Filter.Diff(item, worn)
     local a, b, list = item.stats or {}, worn and worn.stats or {}, {}
     for _, k in ipairs(ORDER) do
@@ -103,7 +99,7 @@ local function evaluate(item, o, slot)
     else
         for _, role in ipairs(Rules.ROLES) do
             if o.roles[role] then
-                local fits, points, main = Rules.ForRole(role, stats)
+                local fits, points, main = Rules.ForRole(role, stats, o.class)
                 if fits then entry.roles[#entry.roles + 1] = { role = role, points = points, main = main } end
             end
         end
@@ -119,7 +115,7 @@ local function evaluate(item, o, slot)
     else
         local wornList = o.worn(slot)
         for _, r in ipairs(entry.roles) do
-            local wp, wm, wornUnclear = weakest(r.role, wornList)
+            local wp, wm, wornUnclear = weakest(r.role, wornList, o.class)
             r.verdict = Filter.Verdict(r.points, r.main, wp, wm)
             if wornUnclear and r.verdict then r.verdict = "ALT" end
             r.delta = r.points - wp

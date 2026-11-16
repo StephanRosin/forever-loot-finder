@@ -15,8 +15,9 @@ A gear finder for **WoW: Forever**. Pick a class, a role and a slot, and the lis
 Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabled. The boss drops and the crafts come from AtlasLoot Classic Forever; the quest rewards, the dungeon entrances and the boss models from DungeonJournal.
 
 ## Classes and roles
-- Each class has its own roles: Priest **Healer** and **Caster**; Paladin **Healer**, **Tank** and **Melee**; Druid **Healer**, **Caster**, **Tank** and **Melee**; and so on. One role is looked at at a time, since healing and damage are measured differently.
-- Items are filtered by their stats: an item must have a stat the role wants and none the role excludes. Casters never see attack power or defense items, tanks never see spell power or mana regen.
+- Each class has its own roles: Priest **Healer** and **DPS**; Paladin **Healer**, **Tank** and **DPS**; Druid **Healer**, **Caster DPS**, **Tank** and **Melee DPS**; Shaman **Healer**, **Caster DPS** and **Melee DPS**; Warrior **Tank** and **DPS**; Hunter, Rogue, Mage and Warlock **DPS**. One role is looked at at a time, since each is measured differently.
+- Items are judged by their stats, with weights per class and role: an item must have a stat the role wants and none the role excludes. Casters never see attack power or defense items, tanks never see spell power (except paladin tank sets).
+- Bear tanks count armour, stamina, agility, defense and dodge, but no parry or block. School spell damage (fire, frost, shadow, ...) counts only for the classes that cast that school.
 - Spell damage items count for healers too, since they carry the same healing. Healing items do not count for casters.
 
 ## Filters
@@ -24,7 +25,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 - **Best armour only**: body armour of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewellery and trinkets always count. Not shown for cloth wearers.
 - **Dungeons**, **raids**, **quests** and **crafting**, each on or off. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
-- **Better than worn** compares every item with what you wear in its slot; **Alternatives** adds the ones about as good. What you wear is not listed.
+- **Better than worn** compares every item with what you wear in its slot (only for your own class); **Alternatives** adds the ones about as good. What you wear is not listed.
 - A **name search**.
 - All 15 **equipment slots** as paper-doll icons.
 - **Sort** by item level, quality or name.

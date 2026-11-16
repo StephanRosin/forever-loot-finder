@@ -28,8 +28,6 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 local SEARCH_ICON = "Interface\\Common\\UI-Searchbox-Icon"
 local QUALITY = { [0] = { 0.62, 0.62, 0.62 }, { 1, 1, 1 }, { 0.12, 1, 0 }, { 0, 0.44, 0.87 }, { 0.64, 0.21, 0.93 },
     { 1, 0.5, 0 } }
-local ROLE_COLORS = { HEAL = { 0.27, 0.88, 0.54 }, CASTER = { 0.70, 0.55, 1 }, TANK = { 0.55, 0.75, 1 },
-    MELEE = { 1, 0.55, 0.35 }, RANGED = { 0.95, 0.85, 0.35 } }
 local UP_COLOR, ALT_COLOR = { 0.3, 0.9, 0.4 }, { 1, 0.82, 0.2 }
 
 local frame
@@ -168,6 +166,15 @@ local function classColor(class)
     return c and { c.r, c.g, c.b } or colour("text")
 end
 
+local function filterRow()
+    local own = currentClass() == select(2, UnitClass("player"))
+    frame.betterChip:SetShown(own)
+    frame.altChip:SetShown(own and S("filterBetter"))
+    -- Cloth wearers have one armour type: "best armour only" would change nothing.
+    frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
+    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
+end
+
 local function roles()
     local class = currentClass()
     local _, own = UnitClass("player")
@@ -268,7 +275,7 @@ local function statText(entry)
         return e and L["EFFECT_" .. e.kind] or L.NO_STATS
     end
     local r = entry.roles[1]
-    local p = Rules.PROFILES[r.role]
+    local p = Rules.Profile(currentClass(), r.role)
     if p.main and r.main and r.main > 0 then return L["VALUE_" .. p.main]:format(r.main) end
     -- No own stat: the two that weigh most.
     local best = {}
@@ -349,7 +356,7 @@ local function newRow(parent)
         GameTooltip:SetHyperlink(e.item.link or ("item:" .. e.item.id))
         -- What it gives or takes against the worn one, stat by stat.
         if e.slot and e.item.loaded then
-            local worn = Filter.Against(e.slot, state.slot and state.invSlot or nil, next(roles()))
+            local worn = Filter.Against(e.slot, state.slot and state.invSlot or nil, next(roles()), currentClass())
             GameTooltip:AddLine(" ")
             if not worn then
                 GameTooltip:AddLine(L.COMPARE_EMPTY, 1, 0.82, 0)
@@ -529,7 +536,7 @@ local function build()
     frame.classMenu:SetPoint("TOPLEFT", frame.classChip, "BOTTOMLEFT", 0, -2)
     frame.roleChips = {}
     for _, role in ipairs(Rules.ROLES) do
-        frame.roleChips[role] = Chip(frame, function() return L["ROLE_" .. role] end, function() return roles()[role] == true end,
+        frame.roleChips[role] = Chip(frame, function() return L[Rules.RoleLabelKey(currentClass(), role)] end, function() return roles()[role] == true end,
             function(v) setRole(role, v) end)
     end
     local box = CreateFrame("EditBox", "ForeverLootFinderSearch", frame)
@@ -574,7 +581,7 @@ local function build()
     frame.filterChips = chipsOf({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
         { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" } })
     frame.altChip = frame.filterChips[#frame.filterChips]
-    frame.armorChip = frame.filterChips[2]
+    frame.armorChip, frame.betterChip = frame.filterChips[2], frame.filterChips[3]
 
     -- Row 3: the slots, their name under them.
     buildSlots(-(TITLE_H + 10 + 3 * (CHIP_H + 8)))
@@ -627,17 +634,18 @@ function Window.Relayout()
         frame.roleChips[role]:SetShown(classRoles[role] == true)
         row1[#row1 + 1] = frame.roleChips[role]
     end
+    for _, role in ipairs(Rules.ROLES) do frame.roleChips[role]:Relabel() end
     flow(row1, frame, PAD, -(TITLE_H + 10))
     flow(frame.sourceChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
-    frame.altChip:SetShown(S("filterBetter"))
-    -- Cloth wearers have one armour type: "best armour only" would change nothing.
-    frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
-    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
+    filterRow()
     Window.Update()
 end
 
+-- Another class is compared with nothing: the worn gear is the player's.
+local function ownClass() return currentClass() == select(2, UnitClass("player")) end
+
 local function wornShown()
-    return S("filterBetter") and state.slot ~= nil
+    return ownClass() and S("filterBetter") and state.slot ~= nil
 end
 
 local function paintWorn()
@@ -709,16 +717,13 @@ function Window.Update()
     for _, chip in ipairs(chips) do paintChip(chip) end
     frame.classChip.fill:SetVertexColor(0, 0, 0, 0)
     paintText(frame.classChip.text, nil, classColor(currentClass()))
-    frame.altChip:SetShown(S("filterBetter"))
-    -- Cloth wearers have one armour type: "best armour only" would change nothing.
-    frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
-    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
+    filterRow()
     paintSlots()
     paintWorn()
     local ok, why = ns.Source.Load()
     if ok then
         local o = Filter.Options({ class = currentClass(), roles = roles(), slot = state.slot,
-            invSlot = state.invSlot, text = state.text })
+            invSlot = state.invSlot, text = state.text, better = ownClass() and S("filterBetter") })
         entries, unknown = Filter.Run(o)
         frame.list.empty:SetText(#entries == 0 and L.NOTHING or "")
     else

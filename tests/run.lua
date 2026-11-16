@@ -440,5 +440,31 @@ for k in pairs(_G) do
 end
 check("no stray globals", table.concat(stray, ","), "")
 
+-- Roles per class (the probe cases of the rule review).
+local boots = Rules.Stats({ ITEM_MOD_STAMINA_SHORT = 21, ITEM_MOD_SPIRIT_SHORT = 18, ITEM_MOD_FROST_DAMAGE_DONE_SHORT = 20,
+    RESISTANCE0_NAME = 69 })
+check("frost boots: mage caster", (Rules.ForRole("CASTER", boots, "MAGE")), true)
+check("frost boots: not a bear's", (Rules.ForRole("TANK", boots, "DRUID")), false)
+check("frost boots: not a priest's heal", (Rules.ForRole("HEAL", boots, "PRIEST")), false)
+local _, frostPts, frostMain = Rules.ForRole("CASTER", boots, "MAGE")
+check("school damage as spell damage", frostMain, 20)
+local bear = Rules.Stats({ ITEM_MOD_STAMINA_SHORT = 15, ITEM_MOD_AGILITY_SHORT = 10, RESISTANCE0_NAME = 200 })
+local cat = Rules.Stats({ ITEM_MOD_STRENGTH_SHORT = 15, ITEM_MOD_AGILITY_SHORT = 15, RESISTANCE0_NAME = 100 })
+check("bear tank: armour counts", select(2, Rules.ForRole("TANK", bear, "DRUID")) > select(2, Rules.ForRole("TANK", cat, "DRUID")), true)
+local warder = Rules.Stats({ ITEM_MOD_STAMINA_SHORT = 20, ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 10, ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = 12 })
+check("spell power tank set: paladin", (Rules.ForRole("TANK", warder, "PALADIN")), true)
+check("spell power tank set: not a warrior's", (Rules.ForRole("TANK", warder, "WARRIOR")), false)
+local hitCaster = Rules.Stats({ ITEM_MOD_INTELLECT_SHORT = 10, ITEM_MOD_HIT_RATING_SHORT = 10 })
+check("hit for casters", (Rules.ForRole("CASTER", hitCaster, "MAGE")), true)
+check("spell power heals", Rules.Stats({ ITEM_MOD_SPELL_POWER_SHORT = 20 }).HEAL, 20)
+check("label: warrior DPS", Rules.RoleLabelKey("WARRIOR", "MELEE"), "ROLE_DPS")
+check("label: priest DPS", Rules.RoleLabelKey("PRIEST", "CASTER"), "ROLE_DPS")
+check("label: druid melee DPS", Rules.RoleLabelKey("DRUID", "MELEE"), "ROLE_MELEE_DPS")
+check("label: shaman caster DPS", Rules.RoleLabelKey("SHAMAN", "CASTER"), "ROLE_CASTER_DPS")
+check("label: tank", Rules.RoleLabelKey("DRUID", "TANK"), "ROLE_TANK")
+for _, k in ipairs({ "ROLE_DPS", "ROLE_MELEE_DPS", "ROLE_CASTER_DPS", "STAT_FROSTDMG" }) do
+    check("deDE " .. k, de[k] ~= nil, true)
+end
+
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

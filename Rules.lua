@@ -28,6 +28,16 @@ Rules.CLASS_ROLES = {
     DRUID = { "HEAL", "CASTER", "TANK", "MELEE" },
 }
 
+-- The label of a role for a class: plain "DPS" when the class deals damage
+-- one way only, "Melee DPS" / "Caster DPS" for shamans and druids.
+local DAMAGE = { MELEE = "ROLE_MELEE_DPS", CASTER = "ROLE_CASTER_DPS", RANGED = "ROLE_DPS" }
+function Rules.RoleLabelKey(class, role)
+    if not DAMAGE[role] then return "ROLE_" .. role end
+    local n = 0
+    for _, r in ipairs(Rules.CLASS_ROLES[class] or {}) do if DAMAGE[r] then n = n + 1 end end
+    return n > 1 and DAMAGE[role] or "ROLE_DPS"
+end
+
 -- GetItemStats' keys (without _SHORT) -> the short names below.
 Rules.STAT_KEYS = {
     ITEM_MOD_STRENGTH = "STR", ITEM_MOD_AGILITY = "AGI", ITEM_MOD_STAMINA = "STA",
@@ -44,11 +54,14 @@ Rules.STAT_KEYS = {
     ITEM_MOD_BLOCK_RATING = "BLOCK", ITEM_MOD_BLOCK_VALUE = "BLOCKVAL",
     ITEM_MOD_EXTRA_ARMOR = "ARMOR", RESISTANCE0_NAME = "ARMOR",
     ITEM_MOD_DAMAGE_PER_SECOND = "DPS",
+    ITEM_MOD_FIRE_DAMAGE_DONE = "FIREDMG", ITEM_MOD_FROST_DAMAGE_DONE = "FROSTDMG",
+    ITEM_MOD_SHADOW_DAMAGE_DONE = "SHADOWDMG", ITEM_MOD_NATURE_DAMAGE_DONE = "NATUREDMG",
+    ITEM_MOD_ARCANE_DAMAGE_DONE = "ARCANEDMG", ITEM_MOD_HOLY_DAMAGE_DONE = "HOLYDMG",
 }
 
--- Stats every caster and healer has no use for.
-local PHYSICAL = { "STR", "AGI", "AP", "RAP", "FAP", "HIT", "RHIT", "CRIT", "RCRIT", "DEF", "DODGE", "PARRY",
-    "BLOCK", "BLOCKVAL" }
+-- Stats every caster and healer has no use for (hit and crit are generic in
+-- Forever: casters use them too).
+local PHYSICAL = { "STR", "AGI", "AP", "RAP", "FAP", "RHIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL" }
 local MAGICAL = { "HEAL", "SPELLDMG", "MP5", "SHIT", "SCRIT" }
 
 local function set(list, more)
@@ -58,34 +71,78 @@ local function set(list, more)
     return s
 end
 
--- main: the role's own stat, which an upgrade must not lose (else it is an
--- alternative: less healing but more spirit is the player's call).
+-- Per role: weights per point as GetItemStats gives them (ratings: about 10
+-- hit, 14 crit or 12 dodge per percent), the stats it wants (one is enough)
+-- and excludes. main: the role's own stat, which an upgrade must not lose
+-- (else it is an alternative: less healing but more spirit is the player's call).
 Rules.PROFILES = {
     HEAL = {
-        weights = { HEAL = 1, MP5 = 2.5, INT = 0.5, SPI = 0.4, SCRIT = 8, STA = 0.1 },
+        weights = { HEAL = 1, MP5 = 2.5, INT = 0.5, SPI = 0.4, CRIT = 0.5, SCRIT = 0.5, STA = 0.1 },
         want = set({ "HEAL", "MP5", "INT", "SPI" }), exclude = set(PHYSICAL), main = "HEAL",
     },
     CASTER = {
-        weights = { SPELLDMG = 1, SHIT = 12, SCRIT = 10, INT = 0.4, STA = 0.1, SPI = 0.1, MP5 = 0.5 },
-        want = set({ "SPELLDMG", "SHIT", "SCRIT", "INT" }), exclude = set(PHYSICAL), main = "SPELLDMG",
-        healingItemsOut = true,
+        weights = { SPELLDMG = 1, HIT = 1.2, SHIT = 1.2, CRIT = 0.7, SCRIT = 0.7, INT = 0.4, STA = 0.2, SPI = 0.1, MP5 = 0.5 },
+        want = set({ "SPELLDMG", "HIT", "SHIT", "CRIT", "SCRIT", "INT" }), exclude = set(PHYSICAL), main = "SPELLDMG",
+        healingItemsOut = true, schools = true,
     },
     TANK = {
-        weights = { DEF = 1.5, DODGE = 12, PARRY = 12, BLOCK = 6, BLOCKVAL = 0.3, STA = 1, ARMOR = 0.03,
-            STR = 0.4, AGI = 0.6, HIT = 5, DPS = 1 },
+        weights = { STA = 1, ARMOR = 0.06, DEF = 1, DODGE = 1, PARRY = 0.6, BLOCK = 0.5, BLOCKVAL = 0.3, STR = 0.3,
+            AGI = 0.6, HIT = 0.4, AP = 0.1, DPS = 1 },
         want = set({ "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "STA" }), exclude = set(MAGICAL),
     },
     MELEE = {
-        weights = { AP = 0.5, FAP = 0.5, STR = 1, AGI = 1, HIT = 10, CRIT = 12, STA = 0.2, DPS = 3 },
-        want = set({ "AP", "FAP", "STR", "AGI", "HIT", "CRIT", "DPS" }), exclude = set(MAGICAL),
+        weights = { STR = 1, AGI = 1, AP = 0.5, HIT = 1.2, CRIT = 1, STA = 0.2, DPS = 3 },
+        want = set({ "AP", "STR", "AGI", "HIT", "CRIT", "DPS" }), exclude = set(MAGICAL),
     },
     RANGED = {
-        weights = { RAP = 0.5, AP = 0.5, AGI = 1, HIT = 10, RHIT = 10, CRIT = 12, RCRIT = 12, INT = 0.2,
-            STA = 0.2, MP5 = 0.5, DPS = 3 },
+        weights = { AGI = 1, RAP = 0.5, AP = 0.5, HIT = 1.2, RHIT = 1.2, CRIT = 1, RCRIT = 1, INT = 0.2, MP5 = 0.5,
+            STA = 0.2, DPS = 3 },
         want = set({ "RAP", "AP", "AGI", "HIT", "RHIT", "CRIT", "RCRIT", "DPS" }),
         exclude = set({ "HEAL", "SPELLDMG", "SHIT", "SCRIT", "DEF", "PARRY", "BLOCK", "BLOCKVAL" }),
     },
 }
+
+-- Per class: weights replace the role's, want/exclude entries switch on
+-- (true) or off (false). Bears cannot parry or block and live on armour;
+-- paladin and shaman damage and tank sets carry spell power.
+local HYBRID = { SPELLDMG = false, HEAL = false, MP5 = false }
+Rules.CLASS_PROFILES = {
+    DRUID = {
+        TANK = { weights = { ARMOR = 0.25, AGI = 0.8, DEF = 0.6, PARRY = 0, BLOCK = 0, BLOCKVAL = 0, DPS = 0, FAP = 0.15 },
+            want = { AGI = true, PARRY = false, BLOCK = false, BLOCKVAL = false } },
+        MELEE = { weights = { STR = 1.2, FAP = 0.5, DPS = 0 }, want = { FAP = true, DPS = false } },
+    },
+    PALADIN = {
+        TANK = { weights = { SPELLDMG = 0.3, INT = 0.2, MP5 = 0.5 }, exclude = HYBRID, healingItemsOut = true },
+        MELEE = { weights = { SPELLDMG = 0.3, INT = 0.2, AGI = 0.6 }, exclude = HYBRID, healingItemsOut = true },
+        HEAL = { weights = { SPI = 0.1, INT = 0.6, CRIT = 0.8 }, want = { SPI = false } },
+    },
+    SHAMAN = {
+        MELEE = { weights = { SPELLDMG = 0.3, INT = 0.2, MP5 = 0.5 }, exclude = HYBRID, healingItemsOut = true },
+        HEAL = { weights = { SPI = 0.1 }, want = { SPI = false } },
+        CASTER = { weights = { SPI = 0, MP5 = 0.8 } },
+    },
+    WARLOCK = { CASTER = { weights = { STA = 0.4, SPI = 0 } } },
+    ROGUE = { MELEE = { weights = { STR = 0.5 }, noMana = true } },
+    WARRIOR = { MELEE = { noMana = true }, TANK = { noMana = true } },
+}
+
+local profiles = {}
+-- The role's profile for a class (the role's own when the class has no override).
+function Rules.Profile(class, role)
+    local key = tostring(class) .. role
+    if profiles[key] then return profiles[key] end
+    local b = Rules.PROFILES[role]
+    local o = Rules.CLASS_PROFILES[class] and Rules.CLASS_PROFILES[class][role] or {}
+    local p = { weights = {}, want = {}, exclude = {}, main = b.main, schools = b.schools,
+        healingItemsOut = b.healingItemsOut or o.healingItemsOut, noMana = o.noMana }
+    for _, f in ipairs({ "weights", "want", "exclude" }) do
+        for k, v in pairs(b[f]) do p[f][k] = v end
+        for k, v in pairs(o[f] or {}) do p[f][k] = v or nil end
+    end
+    profiles[key] = p
+    return p
+end
 
 -- Armour (item class 4) subclasses and weapons (item class 2).
 Rules.ARMOR, Rules.WEAPON = 4, 2
@@ -230,23 +287,62 @@ function Rules.Stats(raw)
             other = true
         end
     end
+    -- "Spell power" alone raises healing as well.
+    local sp = raw and (raw.ITEM_MOD_SPELL_POWER_SHORT or raw.ITEM_MOD_SPELL_POWER)
+    if type(sp) == "number" and not (raw.ITEM_MOD_SPELL_HEALING_DONE_SHORT or raw.ITEM_MOD_SPELL_HEALING_DONE) then
+        stats.HEAL = (stats.HEAL or 0) + sp
+    end
     return stats, other
 end
 
--- How an item serves a role: fits (has a wanted stat, no excluded one),
--- its points and its main stat. A healing item (more healing than damage)
--- is out for casters.
-function Rules.ForRole(role, stats)
-    local p = Rules.PROFILES[role]
-    local fits = false
-    for k in pairs(stats) do
-        if p.exclude[k] then return false, 0, 0 end
-        if p.want[k] then fits = true end
+Rules.SCHOOL_OF = { FIREDMG = "FIRE", FROSTDMG = "FROST", SHADOWDMG = "SHADOW", NATUREDMG = "NATURE",
+    ARCANEDMG = "ARCANE", HOLYDMG = "HOLY" }
+
+-- One school's spell damage counts as spell damage for a caster of that school.
+local function schoolDamage(p, class, stats)
+    local own, best = p.schools and Rules.CLASS_SCHOOLS[class] or {}, 0
+    for k, v in pairs(stats) do
+        local s = Rules.SCHOOL_OF[k]
+        if s and own[s] then best = math.max(best, v) end
     end
-    if p.healingItemsOut and (stats.HEAL or 0) > (stats.SPELLDMG or 0) then return false, 0, 0 end
-    local points = 0
+    return best
+end
+
+-- An item's points and main stat for a role, fitting or not.
+function Rules.Points(role, stats, class)
+    local p = Rules.Profile(class, role)
+    local school = schoolDamage(p, class, stats)
+    local points = school * (p.weights.SPELLDMG or 0)
     for k, v in pairs(stats) do points = points + v * (p.weights[k] or 0) end
-    return fits, points, p.main and (stats[p.main] or 0) or nil
+    local main = p.main and (stats[p.main] or 0) or nil
+    if main and p.main == "SPELLDMG" then main = main + school end
+    return points, main
+end
+
+-- How an item serves a role of a class: fits (a wanted stat, no excluded
+-- one), its points and its main stat. A healing item (more healing than
+-- damage) is out for casters; a school's damage is out for all but its casters.
+function Rules.ForRole(role, stats, class)
+    local p = Rules.Profile(class, role)
+    local own = p.schools and Rules.CLASS_SCHOOLS[class] or {}
+    local fits, school = false, schoolDamage(p, class, stats)
+    for k in pairs(stats) do
+        local s = Rules.SCHOOL_OF[k]
+        if s then
+            if not own[s] then return false, 0, 0 end
+            fits = true
+        else
+            if p.exclude[k] then return false, 0, 0 end
+            if p.want[k] then fits = true end
+        end
+    end
+    if p.healingItemsOut and (stats.HEAL or 0) > (stats.SPELLDMG or 0) + school then return false, 0, 0 end
+    -- No mana: more intellect and spirit than strength and agility is someone else's item.
+    if p.noMana and (stats.INT or 0) + (stats.SPI or 0) > (stats.STR or 0) + (stats.AGI or 0) + (stats.AP or 0) / 2 then
+        return false, 0, 0
+    end
+    local points, main = Rules.Points(role, stats, class)
+    return fits, points, main
 end
 
 -- Effects ("Use:", "Equip:", "Chance on hit:") are text, not stats: words
@@ -278,7 +374,7 @@ Rules.SCHOOL_WORDS = {
 Rules.CLASS_SCHOOLS = {
     MAGE = { FIRE = true, FROST = true, ARCANE = true }, WARLOCK = { FIRE = true, SHADOW = true },
     PRIEST = { SHADOW = true, HOLY = true }, DRUID = { NATURE = true, ARCANE = true },
-    SHAMAN = { NATURE = true, FIRE = true, FROST = true }, PALADIN = { HOLY = true },
+    SHAMAN = { NATURE = true }, PALADIN = { HOLY = true },
 }
 
 -- A chance on hit comes from weapon blows.
