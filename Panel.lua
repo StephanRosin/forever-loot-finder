@@ -17,6 +17,11 @@ local WIDTH, TITLE_H, PAD = 330, 32, 12
 local MAP_W = WIDTH - 2 * PAD
 local MODEL_H = 230
 local MARKER = "Interface\\Minimap\\Dungeon"
+-- Rendered profession loops (art/*.py): 40 frames of 512x384 on two sheets
+-- of 4x5, played at 15 fps. Keyed by AtlasLoot's crafting table name prefix.
+local ART = { "Blacksmithing", "Tailoring", "Leatherworking", "Enchanting" }
+local ART_DIR = "Interface\\AddOns\\" .. ADDON .. "\\Media\\Professions\\"
+local ART_FPS, ART_FRAMES, ART_PER = 15, 40, 20
 
 local panel
 
@@ -62,6 +67,25 @@ local function build(parent)
     map.none:SetPoint("CENTER")
     map.none:SetText(L.NO_MAP)
     panel.map = map
+
+    local art = CreateFrame("Frame", nil, panel)
+    art:SetSize(MAP_W, MODEL_H)
+    art:SetPoint("TOPLEFT", panel.location, "BOTTOMLEFT", 0, -8)
+    art.tex = art:CreateTexture(nil, "ARTWORK")
+    art.tex:SetAllPoints()
+    art.edges = UI.edges(art)
+    art:SetScript("OnUpdate", function(self, elapsed)
+        self.t = (self.t or 0) + elapsed
+        local f = math.floor(self.t * ART_FPS) % ART_FRAMES
+        if f == self.frame then return end
+        self.frame = f
+        local sheet, k = math.floor(f / ART_PER), f % ART_PER
+        self.tex:SetTexture(ART_DIR .. self.name .. "_" .. (sheet + 1) .. ".png")
+        local u, v = (k % 4) * 0.25, math.floor(k / 4) * 0.1875
+        self.tex:SetTexCoord(u, u + 0.25, v, v + 0.1875)
+    end)
+    art:Hide()
+    panel.art = art
 
     panel.entrance = UI.Text(panel, 11, "text")
     panel.entrance:SetPoint("TOPLEFT", map, "BOTTOMLEFT", 0, -6)
@@ -163,7 +187,11 @@ function Panel.Show(parent, entry, onClose)
     local model = panel.model
     panel.map:SetShown(not drop.craft)
     panel.who:ClearAllPoints()
-    local above = drop.craft and panel.location or panel.entrance
+    local artName = drop.craft and Panel.ArtFor(drop.prof)
+    local art = panel.art
+    art.name, art.frame, art.t = artName, nil, 0
+    art:SetShown(artName ~= nil)
+    local above = artName and art or drop.craft and panel.location or panel.entrance
     panel.who:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -12)
     panel.who:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -12)
     if drop.craft then
@@ -202,6 +230,13 @@ function Panel.Show(parent, entry, onClose)
     panel:Show()
 end
 
+-- The art for an AtlasLoot crafting table ("TailoringBC" -> "Tailoring"), or nil.
+function Panel.ArtFor(key)
+    for _, name in ipairs(ART) do
+        if type(key) == "string" and key:sub(1, #name) == name then return name end
+    end
+end
+
 function Panel.Restyle()
     if not panel then return end
     local UI = ns.Window.UI
@@ -211,6 +246,7 @@ function Panel.Restyle()
     panel.title:SetPoint("LEFT", panel.bar, "LEFT", ns.ThemeArt.TextStart(TITLE_H) or PAD, 0)
     panel.title:SetPoint("RIGHT", panel.bar, "RIGHT", -TITLE_H, 0)
     UI.paintEdges(panel.map.edges, UI.colour("muted"), 0.45)
+    UI.paintEdges(panel.art.edges, UI.colour("muted"), 0.45)
     local a = UI.colour("accent")
     panel.map.ring:SetVertexColor(a[1], a[2], a[3], 0.55)
 end

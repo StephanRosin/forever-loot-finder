@@ -18,4 +18,7 @@ done
 # The themes' textures and fonts (with their licence), in the embedded
 # LibForeverThemes.
 cp -r "$HERE/Libs/LibForeverThemes/Media" "$TARGET/Libs/LibForeverThemes/"
+# The rendered profession loops (built from art/ by art/pack.py).
+mkdir -p "$TARGET/Media"
+cp -r "$HERE/Media/Professions" "$TARGET/Media/"
 echo "Installed to $TARGET"

@@ -167,7 +167,7 @@ function Source.ReadCrafting(module, prof)
                         local made = ok and type(data) == "table" and data[1]
                         if type(made) == "number" and not seen[made] then
                             seen[made] = true
-                            list[#list + 1] = { item = made, instance = profName, craft = true, skill = data[3],
+                            list[#list + 1] = { item = made, instance = profName, craft = true, skill = data[3], prof = key,
                                 spellID = spellID, reagents = data[6], counts = data[7], raid = false }
                         end
                     end)
