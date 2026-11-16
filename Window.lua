@@ -166,15 +166,6 @@ local function classColor(class)
     return c and { c.r, c.g, c.b } or colour("text")
 end
 
-local function filterRow()
-    local own = currentClass() == select(2, UnitClass("player"))
-    frame.betterChip:SetShown(own)
-    frame.altChip:SetShown(own and S("filterBetter"))
-    -- Cloth wearers have one armour type: "best armour only" would change nothing.
-    frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
-    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
-end
-
 local function roles()
     local class = currentClass()
     local _, own = UnitClass("player")
@@ -183,6 +174,16 @@ local function roles()
     state.otherRole = state.otherRole or {}
     local role = state.otherRole[class] or (Rules.CLASS_ROLES[class] or {})[1]
     return role and { [role] = true } or {}
+end
+
+local function filterRow()
+    local own = currentClass() == select(2, UnitClass("player"))
+    frame.betterChip:SetShown(own)
+    frame.altChip:SetShown(own and S("filterBetter"))
+    -- Cloth wearers have one armour type: "best armour only" would change nothing.
+    frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
+    frame.hitChip:SetShown(roles().TANK == true)
+    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
 end
 
 -- A role chip picks its role; the picked one stays (one role at a time).
@@ -411,7 +412,10 @@ local function fillRow(row, entry, open)
     row.where:SetText(dropText(d) .. more .. (d.forever and ("  " .. L.NEW_MARK) or ""))
     -- Bears live on armour: an item's bonus armour stands out.
     local bonus = item.bonusArmor and currentClass() == "DRUID" and entry.roles[1] and entry.roles[1].role == "TANK"
-    row.badges:SetText(bonus and ("   " .. L.BONUS_ARMOR:format(item.bonusArmor)) or "")
+    local marks = {}
+    if bonus then marks[#marks + 1] = L.BONUS_ARMOR:format(item.bonusArmor) end
+    if entry.hit then marks[#marks + 1] = L.HIT_MARK:format(entry.hit) end
+    row.badges:SetText(#marks > 0 and ("   " .. table.concat(marks, " · ")) or "")
     paintText(row.badges, nil, UP_COLOR)
     row.value:SetText(statText(entry))
     paintText(row.value, entry.unclear and "muted" or "text")
@@ -582,8 +586,10 @@ local function build()
     frame.sourceChips = chipsOf({ { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
         { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" } })
     frame.filterChips = chipsOf({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
-        { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" } })
-    frame.altChip = frame.filterChips[#frame.filterChips]
+        { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" },
+        { "filterTankHit", "FILTER_TANK_HIT" } })
+    frame.hitChip = frame.filterChips[#frame.filterChips]
+    frame.altChip = frame.filterChips[4]
     frame.armorChip, frame.betterChip = frame.filterChips[2], frame.filterChips[3]
 
     -- Row 3: the slots, their name under them.

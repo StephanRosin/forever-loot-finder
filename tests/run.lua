@@ -31,6 +31,7 @@ M.items = {
         { [HEAL] = 33, [DMG] = 11, ITEM_MOD_INTELLECT_SHORT = 15, ITEM_MOD_SPIRIT_SHORT = 10, RESISTANCE0_NAME = 70 }),
     [105] = item("Agile Cloak", 3, 60, 55, "INVTYPE_CLOAK", 4, 1, { ITEM_MOD_AGILITY_SHORT = 10, ITEM_MOD_ATTACK_POWER_SHORT = 20 }),
     [106] = item("Mystic Trinket", 3, 61, 50, "INVTYPE_TRINKET", 4, 0, {}, { tip = { "Use: Restores 500 health." } }),
+    [208] = item("Bracers of Aim", 4, 61, 55, "INVTYPE_WRIST", 4, 4, { ITEM_MOD_HIT_RATING_SHORT = 10 }),
     [107 + 100] = item("Blank Spaulders", 4, 61, 60, "INVTYPE_SHOULDER", 4, 1, {}),
     [107] = item("Shadow Staff", 4, 65, 60, "INVTYPE_2HWEAPON", 2, 10, { [DMG] = 40, [HEAL] = 40, ITEM_MOD_INTELLECT_SHORT = 20 }),
     [108] = item("Leather Spirit Gloves", 3, 58, 50, "INVTYPE_HAND", 4, 2, { ITEM_MOD_SPIRIT_SHORT = 15 }),
@@ -65,7 +66,7 @@ M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
     { name = "Garr", npcID = 2, [2] = { { 1, 103 }, { 2, 104 }, { 3, 107 }, { 4, 106 }, { 5, 110 }, { 6, 111 },
         { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 }, { 12, 120 }, { 13, 121 }, { 14, 122 }, { 15, 123 }, { 16, 124 },
         { 17, 125 }, { 18, 126 }, { 19, 127 }, { 20, 207 } } },
-    { name = "Twins", npcID = { 3, 4 }, [2] = { { 1, 110 } } },
+    { name = "Twins", npcID = { 3, 4 }, [2] = { { 1, 110 }, { 2, 208 } } },
     { name = "Horde Only Quest Rewards", ExtraList = true, [2] = { { 1, 102 } } },
     { name = "Tier 1 Sets", ExtraList = true, IgnoreAsSource = true, [2] = { { 1, 201 } } },
 } }
@@ -134,7 +135,7 @@ check("only once", again, "CLASSIC")
 section("Source")
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 27)
+check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 28)
 local twins
 for _, d in ipairs(Source.ByItem(110)) do if d.boss == "Twins" then twins = d end end
 check("several npc ids: the first", twins and twins.npcID, 3)
@@ -459,6 +460,11 @@ check("hit for casters", (Rules.ForRole("CASTER", hitCaster, "MAGE")), true)
 check("spell power heals", Rules.Stats({ ITEM_MOD_SPELL_POWER_SHORT = 20 }).HEAL, 20)
 check("bonus armour read", select(3, Rules.Stats({ ITEM_MOD_EXTRA_ARMOR_SHORT = 93, RESISTANCE0_NAME = 200 })), 93)
 check("no bonus armour", select(3, Rules.Stats({ RESISTANCE0_NAME = 200 })), nil)
+local hitOff = ids(run({ class = "WARRIOR", roles = { TANK = true }, slot = Rules.SLOT.WRIST, better = false, now = false }))
+local hitOn = ids(run({ class = "WARRIOR", roles = { TANK = true }, slot = Rules.SLOT.WRIST, better = false, now = false,
+    tankHit = true }))
+check("tank: hit items hidden by default", hitOff[208], nil)
+check("tank: hit items on request, marked", hitOn[208] and hitOn[208].hit, 10)
 check("label: warrior DPS", Rules.RoleLabelKey("WARRIOR", "MELEE"), "ROLE_DPS")
 check("label: priest DPS", Rules.RoleLabelKey("PRIEST", "CASTER"), "ROLE_DPS")
 check("label: druid melee DPS", Rules.RoleLabelKey("DRUID", "MELEE"), "ROLE_MELEE_DPS")

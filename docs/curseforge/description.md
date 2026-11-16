@@ -26,6 +26,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 - **Dungeons**, **raids**, **quests** and **crafting**, each on or off. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
 - **Better than worn** compares every item with what you wear in its slot (only for your own class); **Alternatives** adds the ones about as good. What you wear is not listed.
+- **Hit items** (tanks only): also lists items with hit that no tank stat would bring in, and marks the hit of every item.
 - A **name search**.
 - All 15 **equipment slots** as paper-doll icons.
 - **Sort** by item level, quality or name.

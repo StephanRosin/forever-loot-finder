@@ -20,6 +20,7 @@ Settings.DEFAULTS = {
     -- The window's filters (Filter.lua).
     filterNow = true,           -- only what this character can wear now (level, armour)
     filterBestArmor = false,    -- only the class's best armour type
+    filterTankHit = false,      -- tanks: hit items too, marked
     filterDungeons = true,
     filterRaids = true,
     filterQuests = true,

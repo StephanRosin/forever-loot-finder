@@ -100,6 +100,9 @@ local function evaluate(item, o, slot)
         for _, role in ipairs(Rules.ROLES) do
             if o.roles[role] then
                 local fits, points, main = Rules.ForRole(role, stats, o.class)
+                -- Tanks need hit too: on request hit items count (points > 0: nothing excluded).
+                local hit = role == "TANK" and o.tankHit and (stats.HIT or 0) > 0
+                if hit then fits, entry.hit = fits or points > 0, stats.HIT end
                 if fits then entry.roles[#entry.roles + 1] = { role = role, points = points, main = main } end
             end
         end
@@ -222,7 +225,7 @@ function Filter.Options(over)
     local o = {
         class = class, level = UnitLevel("player") or 60, roles = ns.Settings.Roles(class),
         now = S("filterNow"), bestArmor = S("filterBestArmor"), dungeons = S("filterDungeons"),
-        raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"),
+        raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"), tankHit = S("filterTankHit"),
         sort = S("sort"), text = "",
     }
     for k, v in pairs(over or {}) do o[k] = v end
