@@ -34,6 +34,15 @@ local function newWidget(name, kind)
     function w:SetValue(v) self._value = v end
     function w:GetValue() return self._value end
     function w:SetMinMaxValues(a, b) self._min, self._max = a, b end
+    -- Animations: a group that knows whether it plays.
+    function w:CreateAnimationGroup()
+        local g = newWidget()
+        function g:CreateAnimation() return newWidget() end
+        function g:Play() self._playing = true end
+        function g:Stop() self._playing = false end
+        function g:IsPlaying() return self._playing == true end
+        return g
+    end
     -- The fill texture of a status bar (made on first ask).
     function w:GetStatusBarTexture()
         if not self._fillTex then self._fillTex = newWidget() end

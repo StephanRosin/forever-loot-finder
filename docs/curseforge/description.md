@@ -17,6 +17,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids and Crafting modules enabl
 ## Classes and roles
 - Each class has its own roles: Priest **Healer** and **DPS**; Paladin **Healer**, **Tank** and **DPS**; Druid **Healer**, **Caster DPS**, **Tank** and **Melee DPS**; Shaman **Healer**, **Caster DPS** and **Melee DPS**; Warrior **Tank** and **DPS**; Hunter, Rogue, Mage and Warlock **DPS**. One role is looked at at a time, since each is measured differently.
 - Items are judged by their stats, with weights per class and role: an item must have a stat the role wants and none the role excludes. Casters never see attack power or defense items, tanks never see spell power (except paladin tank sets).
+- Tanks get their heaviest armour type preselected and no two-handers (bears excepted); damage roles get no defense, dodge, parry or block items.
 - Bear tanks count armour, stamina, agility, defense and dodge, but no parry or block. School spell damage (fire, frost, shadow, ...) counts only for the classes that cast that school.
 - Spell damage items count for healers too, since they carry the same healing. Healing items do not count for casters.
 

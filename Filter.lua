@@ -98,7 +98,9 @@ local function evaluate(item, o, slot)
         end
     else
         for _, role in ipairs(Rules.ROLES) do
-            if o.roles[role] then
+            -- Warriors and paladins tank with a shield: no two-handers (bears may).
+            local twoHandTank = role == "TANK" and item.equipLoc == "INVTYPE_2HWEAPON" and o.class ~= "DRUID"
+            if o.roles[role] and not twoHandTank then
                 local fits, points, main = Rules.ForRole(role, stats, o.class)
                 -- Tanks need hit too: on request hit items count (points > 0: nothing excluded).
                 local hit = role == "TANK" and o.tankHit and (stats.HIT or 0) > 0
@@ -178,14 +180,16 @@ function Filter.Run(o)
                 end
                 if wanted then drops[#drops + 1] = d end
             end
-            local item = #drops > 0 and Items.Get(id) or nil
+            local item = #drops > 0 and Items.Instant(id) or nil
             if #drops > 0 and not item then unknown = unknown + 1 end
+            -- The cheap checks first (equip location, class, armour type), the full item only then.
             local slot = item and (wanted or Rules.SlotOf(item.equipLoc, o.class)) or nil
             local keep = slot ~= nil and Rules.InSlot(slot, item.equipLoc, o.class)
                 and Rules.CanWear(o.class, item.classID, item.subClassID, item.equipLoc, wearLevel)
-                and not (o.now and item.loaded and item.reqLevel > o.level)
                 and not (o.bestArmor and not Rules.IsBestArmor(o.class, item.classID, item.subClassID,
                     item.equipLoc, wearLevel))
+            if keep then Items.Full(item) end
+            keep = keep and not (o.now and item.loaded and item.reqLevel > o.level)
                 and not (text and not (item.name and item.name:lower():find(text, 1, true)))
             if keep then Items.Request(item) end
             -- Loaded, but neither stats nor an effect: the client does not know

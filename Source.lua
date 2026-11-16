@@ -41,6 +41,18 @@ local function loadAddon(name)
     return ok and loaded and true or false
 end
 
+-- Inside Source.LoadAsync's coroutine: a pause every few hundred entries,
+-- the rest goes on next frame. Outside one (Source.Load) it does nothing.
+local CHUNK, done = 150, 0
+local function breathe()
+    if not coroutine.running() then return end
+    done = done + 1
+    if done >= CHUNK then
+        done = 0
+        coroutine.yield()
+    end
+end
+
 -- "Name|T…|t" (AtlasLoot's Forever mark) -> "Name", true.
 local function cleanName(name)
     if type(name) ~= "string" then return nil, false end
@@ -122,6 +134,7 @@ function Source.ReadAtlasLoot(module)
                     -- Several creatures (Twin Emperors, Four Horsemen): the first stands for them.
                     local npcID = type(boss.npcID) == "table" and boss.npcID[1] or boss.npcID
                     local seen = {}
+                    breathe()
                     bossItems(boss, function(id)
                         if seen[id] then return end
                         seen[id] = true
@@ -149,6 +162,7 @@ function Source.ReadCrafting(module, prof)
             for _, section in ipairs(content.items) do
                 if type(section) == "table" then
                     bossItems(section, function(spellID)
+                        breathe()
                         local ok, data = pcall(prof.GetProfessionData, spellID)
                         local made = ok and type(data) == "table" and data[1]
                         if type(made) == "number" and not seen[made] then
@@ -169,6 +183,7 @@ function Source.ReadJournal(fdj)
     local list = {}
     for key, dungeon in pairs(fdj.DB) do
         if type(dungeon) == "table" then
+            breathe()
             for _, q in ipairs(type(dungeon.quests) == "table" and dungeon.quests or {}) do
                 for _, r in ipairs(type(q.rewardItems) == "table" and q.rewardItems or {}) do
                     if type(r[1]) == "number" and (r[3] or 0) >= QUEST_QUALITY then
@@ -234,20 +249,50 @@ function Source.Load()
     end
     local fdj = journal()
     if not (module or fdj) then return nil, "NONE" end
-    drops, byItem = module and Source.ReadAtlasLoot(module) or {}, {}
+    -- Built aside and set at the end: while it reads, nothing sees half the drops.
+    local list, index = module and Source.ReadAtlasLoot(module) or {}, {}
     local names = {}
     if module then names[#names + 1] = "AtlasLoot Classic Forever" end
-    for _, d in ipairs(crafting or {}) do drops[#drops + 1] = d end
+    for _, d in ipairs(crafting or {}) do list[#list + 1] = d end
     if fdj then
-        for _, d in ipairs(Source.ReadJournal(fdj)) do drops[#drops + 1] = d end
+        for _, d in ipairs(Source.ReadJournal(fdj)) do list[#list + 1] = d end
         names[#names + 1] = "DungeonJournal"
     end
-    sourceName, journalByNpc = table.concat(names, " + "), indexBosses(fdj)
-    for _, d in ipairs(drops) do
-        byItem[d.item] = byItem[d.item] or {}
-        table.insert(byItem[d.item], d)
+    for _, d in ipairs(list) do
+        index[d.item] = index[d.item] or {}
+        table.insert(index[d.item], d)
     end
+    if drops then return true end -- a direct Source.Load finished first
+    drops, byItem, sourceName, journalByNpc = list, index, table.concat(names, " + "), indexBosses(fdj)
     return true
+end
+
+function Source.Ready() return drops ~= nil end
+
+-- Source.Load spread over frames (the window opens at once and shows that it
+-- loads); done(ok, why) when it is through. Loading AtlasLoot's modules
+-- itself cannot be split.
+local waiting
+function Source.LoadAsync(done)
+    if drops then return done(true) end
+    if waiting then
+        waiting[#waiting + 1] = done
+        return
+    end
+    waiting = { done }
+    local co = coroutine.create(Source.Load)
+    local function step()
+        local ok, a, b = coroutine.resume(co)
+        if not ok then
+            geterrorhandler()(a)
+            a, b = nil, "NONE"
+        end
+        if coroutine.status(co) ~= "dead" then return C_Timer.After(0, step) end
+        local list = waiting
+        waiting = nil
+        for _, fn in ipairs(list) do fn(a, b) end
+    end
+    C_Timer.After(0, step)
 end
 
 function Source.Drops() return drops or {} end

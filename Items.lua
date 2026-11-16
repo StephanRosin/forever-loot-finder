@@ -61,28 +61,34 @@ local function request(id)
     if C_Item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
 end
 
--- The item, or nil when the client does not know the id at all. `loaded`
--- tells whether name, level and stats are there; not loaded, it is not
--- asked for (Items.Request): thousands of ids at once would flood the
--- server, only those that pass the cheap filters are asked for.
-function Items.Get(id)
+-- What the client knows at once (equip location, class, icon), nil when it
+-- does not know the id at all. Cheap: the filter asks it of thousands.
+function Items.Instant(id)
     local item = cache[id]
-    if item and item.loaded then return item end
-    if not item then
-        local equipLoc, icon, classID, subClassID = instant(id)
-        if not equipLoc then return nil end
-        item = { id = id, equipLoc = equipLoc, icon = icon, classID = classID, subClassID = subClassID }
-        cache[id] = item
-    end
-    local name, link, quality, ilvl, reqLevel = full(id)
+    if item then return item end
+    local equipLoc, icon, classID, subClassID = instant(id)
+    if not equipLoc then return nil end
+    item = { id = id, equipLoc = equipLoc, icon = icon, classID = classID, subClassID = subClassID }
+    cache[id] = item
+    return item
+end
+
+-- Name, level and stats when the client has them (`loaded`). Not asked for
+-- here (Items.Request): only what passes the cheap filters is. The tooltip's
+-- effect lines are read only for items without plain stats.
+function Items.Full(item)
+    if not item or item.loaded then return item end
+    local name, link, quality, ilvl, reqLevel = full(item.id)
     if name then
         item.name, item.link, item.quality, item.ilvl, item.reqLevel = name, link, quality, ilvl, reqLevel or 0
         item.stats, item.otherStats, item.bonusArmor = stats(link)
-        item.effects = effects(id)
+        item.effects = ns.Rules.HasStats(item.stats) and {} or effects(item.id)
         item.loaded = true
     end
     return item
 end
+
+function Items.Get(id) return Items.Full(Items.Instant(id)) end
 
 function Items.Request(item)
     if item and not item.loaded then request(item.id) end

@@ -441,6 +441,20 @@ for k in pairs(_G) do
 end
 check("no stray globals", table.concat(stray, ","), "")
 
+-- Opening before the tables are read: at once, with a spinner, the list after.
+Source.Reset()
+M.timers = {}
+ns.Window.Open()
+ns.Window.Update()
+local lf = ns.Window.Frame()
+check("loading: spinner at once", lf.list.spinner:IsShown(), true)
+check("loading: no list yet", #ns.Window.Entries(), 0)
+for _ = 1, 50 do if Source.Ready() then break end M.RunTimers() end
+M.RunTimers()
+check("loading: tables read over frames", Source.Ready(), true)
+check("loading: spinner gone", lf.list.spinner:IsShown(), false)
+check("loading: the list", #ns.Window.Entries() > 0, true)
+
 -- Roles per class (the probe cases of the rule review).
 local boots = Rules.Stats({ ITEM_MOD_STAMINA_SHORT = 21, ITEM_MOD_SPIRIT_SHORT = 18, ITEM_MOD_FROST_DAMAGE_DONE_SHORT = 20,
     RESISTANCE0_NAME = 69 })
@@ -465,6 +479,19 @@ local hitOn = ids(run({ class = "WARRIOR", roles = { TANK = true }, slot = Rules
     tankHit = true }))
 check("tank: hit items hidden by default", hitOff[208], nil)
 check("tank: hit items on request, marked", hitOn[208] and hitOn[208].hit, 10)
+M.items[209] = item("Tank Maul", 4, 61, 55, "INVTYPE_2HWEAPON", 2, 5, { ITEM_MOD_STAMINA_SHORT = 20, ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 10 })
+M.atlas.MoltenCore.items[#M.atlas.MoltenCore.items + 1] = { name = "Axe Boss", npcID = 9, [2] = { { 1, 209 } } }
+Source.Reset()
+Source.Load()
+local function tank2h(class)
+    return ids(run({ class = class, roles = { TANK = true }, slot = Rules.SLOT.MAINHAND, better = false, now = false }))[209]
+end
+check("two-hander: not for a warrior tank", tank2h("WARRIOR"), nil)
+check("two-hander: for a bear", tank2h("DRUID") ~= nil, true)
+check("dodge item: not for a druid's melee DPS", (Rules.ForRole("MELEE", Rules.Stats({ ITEM_MOD_AGILITY_SHORT = 10,
+    ITEM_MOD_DODGE_RATING_SHORT = 12 }), "DRUID")), false)
+check("defense item: not for a warrior's DPS", ids(run({ class = "WARRIOR", roles = { MELEE = true }, slot = Rules.SLOT.MAINHAND,
+    better = false, now = false }))[209] ~= nil, false)
 check("label: warrior DPS", Rules.RoleLabelKey("WARRIOR", "MELEE"), "ROLE_DPS")
 check("label: priest DPS", Rules.RoleLabelKey("PRIEST", "CASTER"), "ROLE_DPS")
 check("label: druid melee DPS", Rules.RoleLabelKey("DRUID", "MELEE"), "ROLE_MELEE_DPS")

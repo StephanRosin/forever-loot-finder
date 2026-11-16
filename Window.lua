@@ -31,6 +31,7 @@ local QUALITY = { [0] = { 0.62, 0.62, 0.62 }, { 1, 1, 1 }, { 0.12, 1, 0 }, { 0, 
 local UP_COLOR, ALT_COLOR = { 0.3, 0.9, 0.4 }, { 1, 0.82, 0.2 }
 
 local frame
+local loading, loadWhy -- the loot tables: being read, or why they could not be
 local state = { slot = nil, invSlot = nil, text = "", class = nil, offset = 0, open = nil }
 local entries, unknown = {}, 0
 local texts = {}   -- every font string: { fs, size, kind } (restyled with the theme)
@@ -187,9 +188,16 @@ local function filterRow()
 end
 
 -- A role chip picks its role; the picked one stays (one role at a time).
+-- Tanks wear their heaviest armour: choosing the role turns the filter on
+-- (it can be turned off again).
+local function tankArmor(class)
+    if Rules.HasArmorChoice(class) and not S("filterBestArmor") then Settings.Set("filterBestArmor", true) end
+end
+
 local function setRole(role, on)
     if not on then return end
     local class = currentClass()
+    if role == "TANK" then tankArmor(class) end
     local _, own = UnitClass("player")
     if class == own then Settings.SetRole(role) else state.otherRole = state.otherRole or {}; state.otherRole[class] = role end
 end
@@ -215,6 +223,7 @@ local function buildClassMenu()
         b.hover:SetVertexColor(1, 1, 1, 0.08)
         b:SetScript("OnClick", function()
             state.class = class
+            if roles().TANK then tankArmor(class) end
             menu:Hide()
             Window.Relayout()
         end)
@@ -471,6 +480,26 @@ local function buildList()
     list.empty:SetWordWrap(true)
     list.empty:SetWidth(WIDTH - 4 * PAD)
     list.empty:SetJustifyH("CENTER")
+    -- While the loot tables load: a ring with a turning spark, in the accent colour.
+    list.spinner = CreateFrame("Frame", nil, list)
+    list.spinner:SetSize(36, 36)
+    list.spinner:SetPoint("TOP", list.empty, "BOTTOM", 0, -12)
+    list.spinner.ring = list.spinner:CreateTexture(nil, "BACKGROUND")
+    list.spinner.ring:SetAllPoints()
+    list.spinner.ring:SetTexture("Interface\\COMMON\\StreamCircle")
+    list.spinner.spark = list.spinner:CreateTexture(nil, "OVERLAY")
+    list.spinner.spark:SetAllPoints()
+    list.spinner.spark:SetTexture("Interface\\COMMON\\StreamSpark")
+    if list.spinner.spark.CreateAnimationGroup then
+        local turn = list.spinner.spark:CreateAnimationGroup()
+        turn:SetLooping("REPEAT")
+        local r = turn:CreateAnimation("Rotation")
+        r:SetDegrees(-360)
+        r:SetDuration(1)
+        list.spinner:SetScript("OnShow", function() turn:Play() end)
+        list.spinner:SetScript("OnHide", function() turn:Stop() end)
+    end
+    list.spinner:Hide()
     list.thumb = fill(list, "OVERLAY")
     list.thumb:SetWidth(2)
     frame.list = list
@@ -729,15 +758,26 @@ function Window.Update()
     filterRow()
     paintSlots()
     paintWorn()
-    local ok, why = ns.Source.Load()
-    if ok then
+    -- The loot tables load over several frames: the window is there at once.
+    if not ns.Source.Ready() and not loading and not loadWhy then
+        loading = true
+        ns.Source.LoadAsync(function(ok, why)
+            loading, loadWhy = false, not ok and why or nil
+            Window.Update()
+        end)
+    end
+    local a = colour("accent")
+    frame.list.spinner.ring:SetVertexColor(a[1], a[2], a[3], 0.5)
+    frame.list.spinner.spark:SetVertexColor(a[1], a[2], a[3], 1)
+    frame.list.spinner:SetShown(loading)
+    if ns.Source.Ready() then
         local o = Filter.Options({ class = currentClass(), roles = roles(), slot = state.slot,
             invSlot = state.invSlot, text = state.text, better = ownClass() and S("filterBetter") })
         entries, unknown = Filter.Run(o)
         frame.list.empty:SetText(#entries == 0 and L.NOTHING or "")
     else
         entries, unknown = {}, 0
-        frame.list.empty:SetText(L["SOURCE_" .. why])
+        frame.list.empty:SetText(loading and L.LOADING_TABLES or L["SOURCE_" .. (loadWhy or "NONE")])
     end
     state.offset = math.max(0, math.min(state.offset, #entries - 1))
     frame.count:SetText(L.HITS:format(#entries))
@@ -810,7 +850,10 @@ local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 events:RegisterEvent("PLAYER_LEVEL_UP")
 events:RegisterEvent("PLAYER_REGEN_ENABLED") -- the loot tables load once combat is over
-events:SetScript("OnEvent", function() if Window.IsShown() then Window.Update() end end)
+events:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_REGEN_ENABLED" and loadWhy == "COMBAT" then loadWhy = nil end
+    if Window.IsShown() then Window.Update() end
+end)
 
 -- A language switch relabels the chips, the search hint and the panel.
 ns.Locale.OnChange(function() Window.Restyle() end)

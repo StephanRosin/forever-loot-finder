@@ -92,7 +92,9 @@ Rules.PROFILES = {
     },
     MELEE = {
         weights = { STR = 1, AGI = 1, AP = 0.5, HIT = 1.2, CRIT = 1, STA = 0.2, DPS = 3 },
-        want = set({ "AP", "STR", "AGI", "HIT", "CRIT", "DPS" }), exclude = set(MAGICAL),
+        -- Tank stats make it a tank's item, not a damage dealer's.
+        want = set({ "AP", "STR", "AGI", "HIT", "CRIT", "DPS" }),
+        exclude = set(MAGICAL, { "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL" }),
     },
     RANGED = {
         weights = { AGI = 1, RAP = 0.5, AP = 0.5, HIT = 1.2, RHIT = 1.2, CRIT = 1, RCRIT = 1, INT = 0.2, MP5 = 0.5,
