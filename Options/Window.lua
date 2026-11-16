@@ -298,11 +298,9 @@ local function charRows()
         check("charButtons", "OPT_CHAR_SHOW"),
         { type = "text", label = "OPT_CHAR_HINT", height = 40 },
         size, choicePoint(), x, y,
-        { type = "buttons", buttons = {
-            { label = "OPT_CHAR_OPEN", width = 220, onClick = function()
-                if ToggleCharacter then ToggleCharacter("PaperDollFrame") end
-            end },
-        } },
+        -- No button that opens it: ToggleCharacter from addon code taints the
+        -- character window (Blizzard's health text then fails on secret values).
+        { type = "text", label = "OPT_CHAR_OPEN", height = 20 },
     }
 end
 
