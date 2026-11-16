@@ -89,8 +89,8 @@ local function evaluate(item, o, slot)
         if #entry.roles == 0 then return nil end
     end
     if not o.better then return entry end
-    -- What is worn is no alternative to itself.
-    for _, worn in ipairs(o.worn(slot)) do
+    -- What is worn is no alternative to itself, in either ring or trinket slot.
+    for _, worn in ipairs(Filter.WornIn(slot)) do
         if worn.id == item.id then return nil end
     end
     if entry.unclear then

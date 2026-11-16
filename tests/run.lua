@@ -251,7 +251,7 @@ got = ids(run({ slot = "TRINKET", better = true }))
 check("against the worn trinket with stats", got[101] and got[101].delta, 30)
 got = ids(run({ slot = "TRINKET", better = true, invSlot = 14 }))
 check("against slot 14", got[101] and got[101].verdict, "UPGRADE")
-check("unclear trinket: alternative", got[106] and got[106].verdict, "ALT")
+check("the other slot's trinket: not listed", got[106], nil)
 M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
 check("worn unclear trinket not listed", ids(run({ slot = "TRINKET", better = true }))[106], nil)
 check("empty slot: all upgrades", ids(run({ slot = "FINGER", better = true }))[102].verdict, "UPGRADE")
