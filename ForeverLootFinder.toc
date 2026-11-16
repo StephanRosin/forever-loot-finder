@@ -5,7 +5,7 @@
 ## Version: 0.1.0
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_02
 ## AddonCompartmentFunc: ForeverLootFinder_OnAddonCompartmentClick
-## OptionalDeps: AtlasLootClassic
+## Dependencies: AtlasLootClassic, ForeverDungeonJournal
 ## SavedVariables: ForeverLootFinderDB
 ## SavedVariablesPerCharacter: ForeverLootFinderChar
 
@@ -23,6 +23,7 @@ Items.lua
 Source.lua
 Filter.lua
 Window.lua
+Panel.lua
 CharButtons.lua
 MinimapButton.lua
 Options\Widgets.lua

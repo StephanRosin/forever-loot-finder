@@ -66,6 +66,21 @@ M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
         { 17, 125 }, { 18, 126 }, { 19, 127 } } },
 } }
 
+-- DungeonJournal: quest rewards, entrances, boss models.
+M.items[130] = item("Quest Robe", 3, 58, 52, "INVTYPE_ROBE", 4, 1, { [HEAL] = 18, ITEM_MOD_INTELLECT_SHORT = 10 })
+M.items[131] = item("Green Thing", 2, 50, 45, "INVTYPE_ROBE", 4, 1, { [HEAL] = 9 })
+M.items[132] = item("Horde Ring", 3, 58, 52, "INVTYPE_FINGER", 4, 0, { [HEAL] = 12 })
+ForeverDungeonJournal_NS = {
+    DB = { ["The Deadmines"] = { location = "Westfall", bosses = { { name = "Cookie", npcID = 1 } },
+        entrance = { mapID = 1436, x = 0.42, y = 0.71, label = "The Deadmines Entrance", detail = "In Moonbrook" },
+        quests = {
+            { name = "Red Silk Bandanas", id = 214, pickup = "Scout Riell", faction = "Alliance", rewardChoice = true,
+                rewardItems = { { 130, "Quest Robe", 3 }, { 131, "Green Thing", 2 } } },
+            { name = "Horde Only", faction = "Horde", rewardItems = { { 132, "Horde Ring", 3 } } },
+        } } },
+    STATIC_DISPLAY_IDS = { [1] = 555 },
+}
+
 -- Load the addon ---------------------------------------------------------------
 local function tocFiles()
     local files = {}
@@ -113,7 +128,7 @@ check("only once", again, "CLASSIC")
 section("Source")
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped", #Source.Drops(), 22)
+check("headers skipped (and two quest rewards)", #Source.Drops(), 24)
 check("instance name without the mark", Source.ByItem(102)[1].instance, "The Deadmines")
 check("Forever mark kept", Source.ByItem(102)[1].forever, true)
 check("name from the map", Source.ByItem(103)[1].instance, "Area2717")
@@ -121,7 +136,13 @@ check("raid by content type", Source.ByItem(103)[1].raid, true)
 check("dungeon", Source.ByItem(102)[1].raid, false)
 check("an item at two places", #Source.ByItem(101), 2)
 check("drop rate", Source.ByItem(101)[1].rate or Source.ByItem(101)[2].rate, 12.5)
-check("name", Source.Name(), "AtlasLoot Forever")
+check("name", Source.Name(), "AtlasLoot Classic Forever + DungeonJournal")
+check("quest reward read", Source.ByItem(130)[1].quest, "Red Silk Bandanas")
+check("green quest reward left out", #Source.ByItem(131), 0)
+check("place by the boss's npc id", Source.Place(Source.ByItem(102)[1]).name, "The Deadmines")
+check("entrance", Source.Place(Source.ByItem(102)[1]).entrance.mapID, 1436)
+check("no place for a raid", Source.Place(Source.ByItem(103)[1]), nil)
+check("boss display", Source.Display(1), 555)
 
 section("Priest, healer and caster")
 local list, unknown = run({})
@@ -143,6 +164,17 @@ check("only the kept unloaded one asked for", table.concat(M.requested, ","), "1
 Settings.Set("filterNow", false)
 check("not 'now': level 70 shown", ids(run({}))[109] ~= nil, true)
 Settings.Set("filterNow", true)
+
+section("Quests")
+got = ids(run({}))
+check("quest reward listed", got[130] and got[130].drops[1].quest, "Red Silk Bandanas")
+check("other faction's quest out", got[132], nil)
+Settings.Set("filterQuests", false)
+check("quests off", ids(run({}))[130], nil)
+Settings.Set("filterQuests", true)
+Settings.Set("filterDungeons", false)
+check("dungeons off: quests stay", ids(run({}))[130] ~= nil, true)
+Settings.Set("filterDungeons", true)
 
 section("Healing and spell damage")
 got = ids(run({ roles = { CASTER = true } }))
@@ -234,6 +266,23 @@ check("verdict: equal points alternative", Filter.Verdict(10, nil, 10, 0), "ALT"
 check("verdict: clearly fewer dropped", Filter.Verdict(5, nil, 10, 0), nil)
 check("verdict: more but less main", Filter.Verdict(20, 5, 10, 8), "ALT")
 
+section("One role at a time")
+check("priest's first role", next(Settings.Roles("PRIEST")), "HEAL")
+M.items[140] = item("Shawl", 3, 60, 55, "INVTYPE_SHOULDER", 4, 1, { [HEAL] = 22, [DMG] = 7, ITEM_MOD_INTELLECT_SHORT = 10 })
+M.items[141] = item("Mantle", 3, 62, 57, "INVTYPE_SHOULDER", 4, 1, { [HEAL] = 15, [DMG] = 15, ITEM_MOD_INTELLECT_SHORT = 12 })
+M.atlas.MoltenCore.items[1][2][#M.atlas.MoltenCore.items[1][2] + 1] = { 30, 141 }
+Source.Reset()
+Source.Load()
+M.state.worn = { [3] = 140 }
+got = ids(run({ slot = "SHOULDER", better = true }))
+check("healer: less healing is no upgrade", got[141] == nil or got[141].verdict ~= "UPGRADE", true)
+Settings.SetRole("CASTER")
+check("role switched", next(Settings.Roles("PRIEST")), "CASTER")
+got = ids(run({ slot = "SHOULDER", better = true }))
+check("caster: more spell damage is", got[141] and got[141].verdict, "UPGRADE")
+Settings.SetRole("HEAL")
+M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
+
 section("Rules")
 check("cloak is no armour type", Rules.IsBestArmor("WARRIOR", 4, 1, "INVTYPE_CLOAK", 60), true)
 check("warrior plate at 40", Rules.CanWear("WARRIOR", 4, 4, "INVTYPE_HEAD", 40), true)
@@ -275,6 +324,38 @@ check("from a slot: better on", Settings.Get("filterBetter"), true)
 check("from a slot: that slot", ns.Window.State().slot, "CHEST")
 check("from a slot: its entries", ns.Window.Entries()[1].item.equipLoc:find("CHEST", 1, true) ~= nil
     or ns.Window.Entries()[1].item.equipLoc == "INVTYPE_ROBE", true)
+local function openItem(id)
+    for i, e in ipairs(ns.Window.Entries()) do if e.item.id == id then ns.Window.OpenEntry(i) return true end end
+end
+local state0 = ns.Window.State()
+state0.slot, state0.invSlot = nil, nil
+Settings.Set("filterBetter", false)
+ns.Window.Update()
+check("panel closed at first", ns.Panel.IsShown(), false)
+check("priest: no best armour chip", ns.Window.Frame().armorChip:IsShown(), false)
+ns.Window.State().class = "WARRIOR"
+ns.Window.Relayout()
+check("warrior: best armour chip", ns.Window.Frame().armorChip:IsShown(), true)
+ns.Window.State().class = nil
+ns.Window.Relayout()
+openItem(102)
+local P = ns.Panel.Frame()
+check("panel opens with a row", ns.Panel.IsShown(), true)
+check("panel: the dungeon", P.title:GetText(), "The Deadmines")
+check("panel: the map's tiles", P.map.tiles[12] and P.map.tiles[12]:IsShown(), true)
+check("panel: entrance marked", P.map.marker:IsShown(), true)
+local _, _, _, mx, my = P.map.marker:GetPoint("CENTER")
+check("panel: marker where the entrance is", math.floor(mx + 0.5) .. "/" .. math.floor(my + 0.5),
+    math.floor(0.42 * 306 + 0.5) .. "/" .. math.floor(-0.71 * 668 * 306 / 1002 + 0.5))
+check("panel: the boss", P.who:GetText(), "Cookie")
+check("panel: model shown", P.model:IsShown(), true)
+openItem(104)
+check("panel: raid without map", P.map.none:IsShown(), true)
+openItem(130)
+check("panel: quest", P.who:GetText(), "Quest: Red Silk Bandanas")
+check("panel: no model for a quest", P.model:IsShown(), false)
+P.bar.close:GetScript("OnClick")(P.bar.close)
+check("panel: closed by its ×", ns.Panel.IsShown(), false)
 check("themes switch", ns.Themes.Switch("PITWALL"), true)
 check("still shown under Pitwall", ns.Window.IsShown(), true)
 check("registered for the hub", _G.ForeverThemes ~= nil, true)
@@ -300,7 +381,7 @@ section("No accidental globals")
 local allowed = { ForeverLootFinderDB = true, ForeverLootFinderChar = true, SLASH_FOREVERLOOTFINDER1 = true,
     SLASH_FOREVERLOOTFINDER2 = true, ForeverLootFinder_OnAddonCompartmentClick = true,
     ForeverLootFinder_OnAddonCompartmentEnter = true, ForeverLootFinder_OnAddonCompartmentLeave = true,
-    LibForeverThemes = true, ForeverThemes = true, ForeverThemesHub = true, ForeverLootFinderWindow = true, ForeverLootFinderSearch = true,
+    LibForeverThemes = true, ForeverThemes = true, ForeverThemesHub = true, ForeverDungeonJournal_NS = true, ForeverLootFinderWindow = true, ForeverLootFinderSearch = true,
     ForeverLootFinderButton = true, ForeverLootFinderOptions = true, ForeverLootFinderOptionsScroll = true,
     ForeverLootFinderInterfacePanel = true, ForeverLootFinderInterfaceOpen = true }
 local stray = {}

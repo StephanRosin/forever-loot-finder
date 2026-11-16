@@ -252,7 +252,18 @@ function GetInventoryItemLink(_, slot)
 end
 function IsModifiedClick() return false end
 function HandleModifiedItemClick(link) M.linked = link end
-C_Map = { GetAreaInfo = function(id) return "Area" .. id end }
+C_Map = { GetAreaInfo = function(id) return "Area" .. id end,
+    GetMapArtLayers = function(id)
+        if id ~= 1436 then return nil end
+        return { { layerWidth = 1002, layerHeight = 668, tileWidth = 256, tileHeight = 256 } }
+    end,
+    GetMapArtLayerTextures = function(id)
+        if id ~= 1436 then return nil end
+        local t = {}
+        for i = 1, 12 do t[i] = 270000 + i end
+        return t
+    end,
+}
 
 -- AtlasLoot ------------------------------------------------------------------
 M.addons = { AtlasLootClassic = true }

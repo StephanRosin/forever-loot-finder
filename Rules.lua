@@ -204,6 +204,12 @@ end
 
 -- Whether it is the class's best armour: only body armour counts (cloaks,
 -- jewellery, shields and off-hands are no armour type).
+-- Whether the class wears more than cloth (else "best armour" picks nothing out).
+function Rules.HasArmorChoice(class)
+    local best = Rules.BestArmor(class)
+    return best ~= nil and best ~= CLOTH
+end
+
 function Rules.IsBestArmor(class, classID, subClassID, equipLoc, level)
     if classID ~= Rules.ARMOR or equipLoc == "INVTYPE_CLOAK" then return true end
     local isBody = false

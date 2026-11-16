@@ -22,6 +22,7 @@ Settings.DEFAULTS = {
     filterBestArmor = false,    -- only the class's best armour type
     filterDungeons = true,
     filterRaids = true,
+    filterQuests = true,
     filterBetter = false,       -- only better than (or alternatives to) what is worn
     filterAlternatives = true,  -- with "better": the unclear ones too
     sort = "ILVL",              -- Filter.SORTS
@@ -76,19 +77,23 @@ function Settings.Set(key, value)
 end
 
 -- The roles chosen for the player's class: every role of it until chosen.
-function Settings.Roles(class)
-    local stored = ns.CharDB().roles
-    local roles = {}
-    for _, role in ipairs(ns.Rules.CLASS_ROLES[class] or {}) do
-        roles[role] = not (stored and stored[role] == false)
-    end
-    return roles
+-- One role at a time ({ HEAL = true }): healing and damage are measured
+-- differently, an item better for one would count as an upgrade for both.
+-- The character's chosen role, else the class's first.
+function Settings.Role(class)
+    local list = ns.Rules.CLASS_ROLES[class] or {}
+    local stored = ns.CharDB().role
+    for _, role in ipairs(list) do if role == stored then return role end end
+    return list[1]
 end
 
-function Settings.SetRole(role, on)
-    local char = ns.CharDB()
-    char.roles = char.roles or {}
-    char.roles[role] = (not on) and false or nil
+function Settings.Roles(class)
+    local role = Settings.Role(class)
+    return role and { [role] = true } or {}
+end
+
+function Settings.SetRole(role)
+    ns.CharDB().role = role
     Settings.Changed("roles")
 end
 

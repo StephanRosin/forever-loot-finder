@@ -7,14 +7,26 @@ Forever, nothing is copied: AtlasLoot Forever's dungeon and raid module
 (AtlasLootClassic_DungeonsAndRaids, loaded on demand; loading it is
 refused in combat). An adapter per source, so more can join later.
 
-Source.Drops() lists { item, instance, boss, npcID, raid, forever, rate };
-Source.ByItem(id) the drops of one item.
+Quest rewards (blue and better) come from DungeonJournal (Forever Dungeon
+Journal, its global ForeverDungeonJournal_NS): its dungeons' quests with
+their reward items. It also knows each dungeon's entrance on the world map
+and its bosses' models (Source.Place, Source.Display).
+
+Source.Drops() lists { item, instance, boss, npcID, raid, forever, rate }
+and, for quests, { item, instance, quest, questID, giver, choice, faction,
+classOnly, journal }; Source.ByItem(id) the drops of one item.
 -----------------------------------------------------------------------------]]
 local Source = {}
 ns.Source = Source
 
-local drops, byItem, sourceName
+local drops, byItem, sourceName, journalByNpc
 local MODULE, CORE = "AtlasLootClassic_DungeonsAndRaids", "AtlasLootClassic"
+local QUEST_QUALITY = 3
+
+local function journal()
+    local fdj = rawget(_G, "ForeverDungeonJournal_NS")
+    return type(fdj) == "table" and type(fdj.DB) == "table" and fdj or nil
+end
 
 local function addonLoaded(name)
     local fn = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
@@ -108,19 +120,81 @@ function Source.ReadAtlasLoot(module)
     return list
 end
 
+-- The journal's quest rewards of at least QUEST_QUALITY.
+function Source.ReadJournal(fdj)
+    local list = {}
+    for key, dungeon in pairs(fdj.DB) do
+        if type(dungeon) == "table" then
+            for _, q in ipairs(type(dungeon.quests) == "table" and dungeon.quests or {}) do
+                for _, r in ipairs(type(q.rewardItems) == "table" and q.rewardItems or {}) do
+                    if type(r[1]) == "number" and (r[3] or 0) >= QUEST_QUALITY then
+                        list[#list + 1] = { item = r[1], instance = key, quest = q.name or "?", questID = q.id,
+                            giver = q.pickup, choice = q.rewardChoice == true, faction = q.faction,
+                            classOnly = q.classOnly, journal = key, raid = false }
+                    end
+                end
+            end
+        end
+    end
+    return list
+end
+
+-- The journal's dungeon of each boss by npc id.
+local function indexBosses(fdj)
+    local index = {}
+    for key, dungeon in pairs(fdj and fdj.DB or {}) do
+        for _, boss in ipairs(type(dungeon) == "table" and type(dungeon.bosses) == "table" and dungeon.bosses or {}) do
+            if type(boss) == "table" and boss.npcID then index[boss.npcID] = key end
+        end
+    end
+    return index
+end
+
+-- Where a drop is, from the journal: { name, location, entrance = { mapID,
+-- x, y, label, detail } }, nil when the journal does not know it (raids).
+function Source.Place(drop)
+    local fdj = journal()
+    if not (fdj and drop) then return nil end
+    local key = drop.journal or (journalByNpc and drop.npcID and journalByNpc[drop.npcID])
+    if not key and fdj.DungeonFromInstanceName then
+        local ok, found = pcall(fdj.DungeonFromInstanceName, drop.instance)
+        key = ok and found or nil
+    end
+    local dungeon = key and fdj.DB[key]
+    if type(dungeon) ~= "table" then return nil end
+    return { name = key, location = dungeon.location, entrance = dungeon.entrance }
+end
+
+-- A boss's creature display id from the journal (nil: ask by npc id).
+function Source.Display(npcID)
+    local fdj = journal()
+    local ids = fdj and fdj.STATIC_DISPLAY_IDS
+    return npcID and type(ids) == "table" and ids[npcID] or nil
+end
+
 -- Loads the source once (not in combat). Returns true when drops are there,
 -- else nil and why: "NONE" (no source addon), "COMBAT".
 function Source.Load()
     if drops then return true end
-    if not addonLoaded(CORE) then return nil, "NONE" end
-    if not addonLoaded(MODULE) then
-        if InCombatLockdown() then return nil, "COMBAT" end
-        if not loadAddon(MODULE) then return nil, "NONE" end
+    local module
+    if addonLoaded(CORE) then
+        if not addonLoaded(MODULE) then
+            if InCombatLockdown() then return nil, "COMBAT" end
+            loadAddon(MODULE)
+        end
+        local db = AtlasLoot and AtlasLoot.ItemDB and AtlasLoot.ItemDB.Storage
+        module = db and db[MODULE]
     end
-    local db = AtlasLoot and AtlasLoot.ItemDB and AtlasLoot.ItemDB.Storage
-    local module = db and db[MODULE]
-    if not module then return nil, "NONE" end
-    drops, byItem, sourceName = Source.ReadAtlasLoot(module), {}, "AtlasLoot Forever"
+    local fdj = journal()
+    if not (module or fdj) then return nil, "NONE" end
+    drops, byItem = module and Source.ReadAtlasLoot(module) or {}, {}
+    local names = {}
+    if module then names[#names + 1] = "AtlasLoot Classic Forever" end
+    if fdj then
+        for _, d in ipairs(Source.ReadJournal(fdj)) do drops[#drops + 1] = d end
+        names[#names + 1] = "DungeonJournal"
+    end
+    sourceName, journalByNpc = table.concat(names, " + "), indexBosses(fdj)
     for _, d in ipairs(drops) do
         byItem[d.item] = byItem[d.item] or {}
         table.insert(byItem[d.item], d)
@@ -133,4 +207,4 @@ function Source.ByItem(id) return byItem and byItem[id] or {} end
 function Source.Name() return sourceName end
 
 -- Forgets the drops (the tests).
-function Source.Reset() drops, byItem, sourceName = nil, nil, nil end
+function Source.Reset() drops, byItem, sourceName, journalByNpc = nil, nil, nil, nil end

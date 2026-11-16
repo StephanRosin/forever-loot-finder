@@ -143,7 +143,14 @@ function Filter.Run(o)
             seen[id] = true
             local drops = {}
             for _, d in ipairs(ns.Source.ByItem(id)) do
-                if (d.raid and o.raids) or (not d.raid and o.dungeons) then drops[#drops + 1] = d end
+                local wanted
+                if d.quest then
+                    wanted = o.quests and (not d.faction or d.faction == "Both" or d.faction == o.faction)
+                        and (not d.classOnly or tostring(d.classOnly):upper() == o.class)
+                else
+                    wanted = (d.raid and o.raids) or (not d.raid and o.dungeons)
+                end
+                if wanted then drops[#drops + 1] = d end
             end
             local item = #drops > 0 and Items.Get(id) or nil
             if #drops > 0 and not item then unknown = unknown + 1 end
@@ -185,7 +192,7 @@ function Filter.Options(over)
     local o = {
         class = class, level = UnitLevel("player") or 60, roles = ns.Settings.Roles(class),
         now = S("filterNow"), bestArmor = S("filterBestArmor"), dungeons = S("filterDungeons"),
-        raids = S("filterRaids"), better = S("filterBetter"), alternatives = S("filterAlternatives"),
+        raids = S("filterRaids"), quests = S("filterQuests"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"),
         sort = S("sort"), text = "",
     }
     for k, v in pairs(over or {}) do o[k] = v end

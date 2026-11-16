@@ -21,6 +21,7 @@ local Lib = LibForeverThemes
 
 -- Wide enough for the widest theme and language (Console, Frost in German: 744 measured).
 local WIDTH, HEIGHT, TITLE_H, PAD = 780, 640, 32, 12
+local SOURCE_GAP = 14
 local CHIP_H, CHIP_GAP, SLOT_SIZE = 22, 6, 32
 local ROW_H, ROW_GAP, DETAIL_LINE, ICON = 44, 4, 16, 34
 local FOOTER_H = 26
@@ -92,6 +93,9 @@ end
 local function paintEdges(e, c, a)
     for _, t in ipairs(e) do t:SetVertexColor(c[1], c[2], c[3], a or c[4] or 1) end
 end
+
+-- The look for Panel.lua (its texts restyle with the window's).
+Window.UI = { Text = Text, colour = colour, paintText = paintText, fill = fill, edges = edges, paintEdges = paintEdges }
 
 -- ---------------------------------------------------------------------------
 -- Chips: a toggle with a tick, as in the mockup
@@ -169,21 +173,18 @@ local function roles()
     local class = currentClass()
     local _, own = UnitClass("player")
     if class == own then return Settings.Roles(class) end
-    -- Another class: all its roles, until chosen in this session.
-    state.otherRoles = state.otherRoles or {}
-    local r = state.otherRoles[class]
-    if not r then
-        r = {}
-        for _, role in ipairs(Rules.CLASS_ROLES[class] or {}) do r[role] = true end
-        state.otherRoles[class] = r
-    end
-    return r
+    -- Another class: its first role, until another is chosen in this session.
+    state.otherRole = state.otherRole or {}
+    local role = state.otherRole[class] or (Rules.CLASS_ROLES[class] or {})[1]
+    return role and { [role] = true } or {}
 end
 
+-- A role chip picks its role; the picked one stays (one role at a time).
 local function setRole(role, on)
+    if not on then return end
     local class = currentClass()
     local _, own = UnitClass("player")
-    if class == own then Settings.SetRole(role, on) else roles()[role] = on end
+    if class == own then Settings.SetRole(role) else state.otherRole = state.otherRole or {}; state.otherRole[class] = role end
 end
 
 local function buildClassMenu()
@@ -283,6 +284,7 @@ local function statText(entry)
 end
 
 local function dropText(d)
+    if d.quest then return ("%s · %s"):format(L.QUEST_NAME:format(d.quest), d.instance) end
     local where = ("%s · %s"):format(d.boss, d.instance)
     if d.rate then where = where .. (" · %s %%"):format(d.rate) end
     return where
@@ -367,7 +369,8 @@ local function details(entry)
             lines[#lines + 1] = L.MORE_DROPS:format(#entry.drops - 4)
             break
         end
-        lines[#lines + 1] = ("%s  %s"):format(d.raid and L.RAID or L.DUNGEON, dropText(d))
+        local line = d.quest and dropText(d) or ("%s  %s"):format(d.raid and L.RAID or L.DUNGEON, dropText(d))
+        lines[#lines + 1] = line .. (d.choice and ("  (" .. L.QUEST_CHOICE .. ")") or "")
     end
     local item = entry.item
     for i, e in ipairs(item.effects or {}) do
@@ -418,18 +421,19 @@ end
 -- ---------------------------------------------------------------------------
 -- Building
 -- ---------------------------------------------------------------------------
-local function closeButton(bar)
+local function closeButton(bar, onClick)
     local b = CreateFrame("Button", nil, bar)
     b:SetSize(TITLE_H, TITLE_H)
     b:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
     b.text = Text(b, 16, "muted")
     b.text:SetPoint("CENTER")
     b.text:SetText("×")
-    b:SetScript("OnClick", function() frame:Hide() end)
+    b:SetScript("OnClick", onClick or function() frame:Hide() end)
     b:SetScript("OnEnter", function() paintText(b.text, "accent") end)
     b:SetScript("OnLeave", function() paintText(b.text, "muted") end)
     return b
 end
+Window.UI.closeButton = closeButton
 
 local function buildList()
     local list = CreateFrame("Frame", nil, frame)
@@ -515,7 +519,7 @@ local function build()
     end
     local box = CreateFrame("EditBox", "ForeverLootFinderSearch", frame)
     box:SetSize(170, CHIP_H)
-    box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10))
+    box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10 + CHIP_H + 8))
     box:SetAutoFocus(false)
     box:SetTextInsets(22, 6, 0, 0)
     box.back = fill(box, "BACKGROUND")
@@ -540,16 +544,22 @@ local function build()
     box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     frame.search = box
 
-    -- Row 2: the filters.
+    -- Row 1 on: where items come from. Row 2: the filters (and the search).
     local function setting(key) return function() return S(key) end, function(v) Settings.Set(key, v) end end
-    frame.filterChips = {}
-    for _, f in ipairs({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
-        { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
-        { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" } }) do
-        local get, set = setting(f[1])
-        frame.filterChips[#frame.filterChips + 1] = Chip(frame, L[f[2]], get, set)
+    local function chipsOf(list)
+        local out = {}
+        for _, f in ipairs(list) do
+            local get, set = setting(f[1])
+            out[#out + 1] = Chip(frame, L[f[2]], get, set)
+        end
+        return out
     end
+    frame.sourceChips = chipsOf({ { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
+        { "filterQuests", "FILTER_QUESTS" } })
+    frame.filterChips = chipsOf({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
+        { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" } })
     frame.altChip = frame.filterChips[#frame.filterChips]
+    frame.armorChip = frame.filterChips[2]
 
     -- Row 3: the slots, their name under them.
     buildSlots(-(TITLE_H + 10 + 2 * (CHIP_H + 8)))
@@ -602,8 +612,11 @@ function Window.Relayout()
         frame.roleChips[role]:SetShown(classRoles[role] == true)
         row1[#row1 + 1] = frame.roleChips[role]
     end
-    flow(row1, frame, PAD, -(TITLE_H + 10))
+    local x = flow(row1, frame, PAD, -(TITLE_H + 10))
+    flow(frame.sourceChips, frame, x + SOURCE_GAP, -(TITLE_H + 10))
     frame.altChip:SetShown(S("filterBetter"))
+    -- Cloth wearers have one armour type: "best armour only" would change nothing.
+    frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
     flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
     Window.Update()
 end
@@ -657,6 +670,9 @@ function Window.Draw()
         y = y + h + ROW_GAP
     end
     for i = n + 1, #list.rows do list.rows[i]:Hide(); list.rows[i].entry = nil end
+    local opened
+    for _, e in ipairs(entries) do if e.item.id == state.open then opened = e end end
+    ns.Panel.Show(frame, opened, function() state.open = nil; Window.Draw() end)
     local a = colour("accent")
     list.thumb:SetVertexColor(a[1], a[2], a[3], 0.8)
     if #entries > n and #entries > 0 then
@@ -678,6 +694,8 @@ function Window.Update()
     frame.classChip.fill:SetVertexColor(0, 0, 0, 0)
     paintText(frame.classChip.text, nil, classColor(currentClass()))
     frame.altChip:SetShown(S("filterBetter"))
+    -- Cloth wearers have one armour type: "best armour only" would change nothing.
+    frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
     flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
     paintSlots()
     paintWorn()
@@ -710,6 +728,7 @@ function Window.Restyle()
     paintEdges(frame.search.edges, colour("muted"), 0.45)
     paintEdges(frame.classMenu.edges, colour("accent"), 0.8)
     for _, chip in ipairs(chips) do chip:Relabel() end
+    ns.Panel.Restyle()
     Window.Relayout()
 end
 
