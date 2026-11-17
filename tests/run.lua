@@ -767,6 +767,12 @@ do
     check("dynamic: at the cap new hit is worthless", Rules.Points("CASTER", { HIT = 20 }, "MAGE", Rules.HitRoom("CASTER", "MAGE", {})), 0)
     check("dynamic: worn hit counts at the cap", near(Rules.Points("CASTER", { HIT = 20 }, "MAGE"), 20 * B / 100 / 0.99 / 10), true)
     check("dynamic: melee crit from swing damage", near(Rules.Points("MELEE", { CRIT = 14 }, "MAGE"), 120 * 7 * 0.01 / 1.05 * 0.5), true)
+    -- Secret in combat: the last stand it could read stays.
+    local kept = Rules.char
+    issecretvalue = function(v) return v == 100 end   -- UnitDamage's min
+    Rules.ReadChar()
+    check("dynamic: secret values keep the last stand", Rules.char, kept)
+    issecretvalue = nil
     ns.Settings.Set("dynamic", false)
     Rules.ReadChar()
     check("dynamic off: fixed weights", Rules.Points("CASTER", { HIT = 20 }, "MAGE"), 24)

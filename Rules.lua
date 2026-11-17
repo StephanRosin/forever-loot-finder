@@ -209,6 +209,22 @@ Rules.DYNAMIC = {
     MELEE = { unit = "AP", hit = { "HIT" }, crit = { "CRIT" }, cap = 9, crHit = 6, crCrit = 9 },
     RANGED = { unit = "RAP", hit = { "HIT", "RHIT" }, crit = { "CRIT", "RCRIT" }, cap = 9, crHit = 7, crCrit = 10 },
 }
+-- A value the game gives, nothing when there is no such function or Forever keeps it secret
+-- (in combat): then `hidden` is set and ReadChar keeps the last stand it could read.
+local hidden
+local function pass(...)
+    for i = 1, select("#", ...) do
+        if issecretvalue and issecretvalue((select(i, ...))) then
+            hidden = true
+            return
+        end
+    end
+    return ...
+end
+local function read(f, ...)
+    if f then return pass(f(...)) end
+end
+
 -- The caster's main nuke per school (GetSpellBonusDamage index: 3 fire, 4 nature, 5 frost, 6 shadow,
 -- 7 arcane) and its spell power coefficient; the damage comes from the highest rank known, as the
 -- game describes it (Forever's text holds the spell power from items and buffs already). Among several, the school with the most spell power. Crits do double damage
@@ -228,9 +244,9 @@ function Rules.Nuke(class)
     for _, s in ipairs(Rules.CASTER_SPELLS[class] or {}) do
         local info = C_Spell and C_Spell.GetSpellInfo(s[1])
         local top = info and C_Spell.GetSpellInfo(info.name)   -- by name: the highest rank known
-        local text = top and C_Spell.GetSpellDescription(top.spellID) or ""
+        local text = top and read(C_Spell.GetSpellDescription, top.spellID) or ""
         local lo, hi = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):match("(%d+)%s+%a+%s+(%d+)")
-        local sp = GetSpellBonusDamage(s[2]) or 0
+        local sp = read(GetSpellBonusDamage, s[2]) or 0
         if lo and (not best or sp > best.sp) then
             best = { school = s[2], sp = sp, damage = (lo + hi) / 2 / s[3] }
         end
@@ -242,20 +258,20 @@ local RATING_PER_PCT = { hit = 10, crit = 14 }   -- without own rating to measur
 
 -- The rating that makes one percent: measured on the character, else the usual.
 local function perPct(cr, fallback)
-    local r, b = GetCombatRating and GetCombatRating(cr) or 0, GetCombatRatingBonus and GetCombatRatingBonus(cr) or 0
+    local r, b = read(GetCombatRating, cr) or 0, read(GetCombatRatingBonus, cr) or 0
     return (r > 0 and b > 0) and r / b or fallback
 end
 
 -- The player's damage, hit and crit per damage role, read fresh (each search); nil: fixed weights.
 function Rules.ReadChar()
-    Rules.char = nil
-    dynamics = {}
+    local last, lastDynamics = Rules.char, dynamics
+    Rules.char, dynamics, hidden = nil, {}, false
     if not (ns.Settings and ns.Settings.Get("dynamic")) or not GetCombatRatingBonus then return end
     local _, class = UnitClass("player")
     local nuke = Rules.Nuke(class)
-    local speed = UnitAttackSpeed("player") or 2
-    local min, max = UnitDamage("player")
-    local rSpeed, rMin, rMax = UnitRangedDamage("player")
+    local speed = read(UnitAttackSpeed, "player") or 2
+    local min, max = read(UnitDamage, "player")
+    local rSpeed, rMin, rMax = read(UnitRangedDamage, "player")
     -- Whole damage in the role's stat: a swing is worth its damage as attack power over 14 per second.
     local base = {
         CASTER = nuke and nuke.damage or 0,
@@ -266,8 +282,8 @@ function Rules.ReadChar()
     local critNow = { CASTER = GetSpellCritChance, MELEE = GetCritChance, RANGED = GetRangedCritChance }
     Rules.char = { class = class }
     for role, d in pairs(Rules.DYNAMIC) do
-        local hit = (GetCombatRatingBonus(d.crHit) or 0) + (hitMod[role] and hitMod[role]() or 0)
-        local crit = (critNow[role] and critNow[role](nuke and nuke.school) or 0) / 100   -- spell crit of the nuke's school
+        local hit = (read(GetCombatRatingBonus, d.crHit) or 0) + (read(hitMod[role]) or 0)
+        local crit = (read(critNow[role], nuke and nuke.school) or 0) / 100   -- spell crit of the nuke's school
         local hitPerPct, critPerPct = perPct(d.crHit, RATING_PER_PCT.hit), perPct(d.crCrit, RATING_PER_PCT.crit)
         Rules.char[role] = {
             hitPct = hit, missing = math.max(0, d.cap - hit),
@@ -278,6 +294,7 @@ function Rules.ReadChar()
             hitPerPct = hitPerPct, critPerPct = critPerPct,
         }
     end
+    if hidden then Rules.char, dynamics = last, lastDynamics end
 end
 
 -- The dynamic hit and crit weights of a role for a class, nil when fixed: another class
