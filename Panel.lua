@@ -112,6 +112,14 @@ local function build(parent)
     panel.whoDetail:SetPoint("TOPRIGHT", panel.who, "BOTTOMRIGHT", 0, -3)
     panel.whoDetail:SetWordWrap(true)
 
+    -- "Track recipe": Blizzard's recipe tracking, shown by its objective tracker
+    -- and by Forever Quest Log (the crafted item as heading, reagents as objectives).
+    panel.track = UI.Chip(panel, function() return L.TRACK_RECIPE end,
+        function() return Panel.IsTracked(panel.spellID) end,
+        function(on) C_TradeSkillUI.SetRecipeTracked(panel.spellID, on, false) end)
+    panel.track:SetPoint("RIGHT", panel.who, "RIGHT", 0, 0)
+    panel.track:Hide()
+
     -- A craft's reagents: a table (count and name, price each, line total), the sum, hints.
     local mats = CreateFrame("Frame", nil, panel)
     mats:SetPoint("TOPLEFT", panel.who, "BOTTOMLEFT", 0, -8)
@@ -272,6 +280,9 @@ function Panel.Show(parent, entry, onClose)
     panel.mats:SetShown(drop.craft == true)
     panel.recipe:SetText(drop.craft and Panel.RecipeText(drop.spellID, drop.item) or "")
     panel.recipe:SetShown(drop.craft == true)
+    panel.spellID = drop.craft and drop.spellID
+    panel.track:SetShown(Panel.CanTrack(panel.spellID))
+    ns.Window.UI.paintChip(panel.track)
     if drop.craft then
         panel.title:SetText(drop.instance)
         panel.location:SetText(L.CRAFT_SKILL:format(drop.skill or 0))
@@ -306,6 +317,16 @@ function Panel.Show(parent, entry, onClose)
         model:SetFacing(0)
     end
     panel:Show()
+end
+
+-- Tracking needs the client's recipe tracker and the craft's recipe spell.
+function Panel.CanTrack(spellID)
+    return spellID ~= nil and C_TradeSkillUI ~= nil and C_TradeSkillUI.SetRecipeTracked ~= nil
+        and C_TradeSkillUI.IsRecipeTracked ~= nil
+end
+
+function Panel.IsTracked(spellID)
+    return Panel.CanTrack(spellID) and C_TradeSkillUI.IsRecipeTracked(spellID, false) or false
 end
 
 -- The art for an AtlasLoot crafting table ("TailoringBC" -> "Tailoring"), or nil.

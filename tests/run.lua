@@ -474,6 +474,20 @@ IsModifiedClick = function(what) return what == "CHATLINK" end
 mats.rows[1].hit:GetScript("OnClick")(mats.rows[1].hit)
 IsModifiedClick = function() return false end
 check("panel: shift-click links a reagent", M.linked ~= nil and M.linked:find("14047") ~= nil, true)
+-- "Track recipe": Blizzard's recipe tracking, which Forever Quest Log shows too.
+check("panel: no tracking without the API", P.track:IsShown(), false)
+local tracked = {}
+C_TradeSkillUI = { SetRecipeTracked = function(id, on) tracked[id] = on or nil end,
+    IsRecipeTracked = function(id) return tracked[id] == true end }
+ns.Panel.Refresh()
+check("panel: track chip shown", P.track:IsShown(), true)
+check("panel: chip off at first", P.track.tick:IsShown(), false)
+P.track:GetScript("OnClick")(P.track)
+check("panel: recipe spell tracked", tracked[P.spellID] and P.spellID ~= nil, true)
+check("panel: chip ticked", P.track.tick:IsShown(), true)
+P.track:GetScript("OnClick")(P.track)
+check("panel: untracked again", tracked[P.spellID], nil)
+C_TradeSkillUI = nil
 check("panel: no prices yet: hint", mats:IsShown() and mats.hints[1]:GetText(), ns.L.MATS_NONE)
 -- The auction house: two Runecloth auctions (stacks of 20 at 2g, of 10 at 1g 50s).
 local Prices = ns.Prices

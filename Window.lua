@@ -140,6 +140,8 @@ local function Chip(parent, label, get, set, opts)
     return chip
 end
 
+Window.UI.Chip, Window.UI.paintChip = Chip, paintChip
+
 -- Lays chips out from x along a row.
 local function flow(list, parent, x, y)
     for _, chip in ipairs(list) do
@@ -963,6 +965,7 @@ local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 events:RegisterEvent("PLAYER_LEVEL_UP")
 events:RegisterEvent("PLAYER_REGEN_ENABLED") -- the loot tables load once combat is over
+events:RegisterEvent("TRACKED_RECIPE_UPDATE") -- the panel's "Track recipe"
 events:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_REGEN_ENABLED" and loadWhy == "COMBAT" then loadWhy = nil end
     if Window.IsShown() then Window.Update() end
