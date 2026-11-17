@@ -201,6 +201,15 @@ end
 -- and how many items the client does not know.
 function Filter.Run(o)
     Rules.ReadChar()
+    -- The worn items once per slot and run: every item asks them (hit room), thousands without a filter.
+    local wornOf, worn = {}, o.worn
+    if worn then
+        o = setmetatable({ worn = function(slot)
+            local w = wornOf[slot]
+            if not w then w = worn(slot); wornOf[slot] = w end
+            return w
+        end }, { __index = o })
+    end
     local list, seen, unknown = {}, {}, 0
     local text = o.text and o.text ~= "" and o.text:lower() or nil
     -- A search is global: every source, slot, class and role; only the name counts.
@@ -247,7 +256,7 @@ function Filter.Run(o)
             if keep and item.loaded and not Rules.HasStats(item.stats) and not item.otherStats
                 and #(item.effects or {}) == 0 then
                 keep, unknown = false, unknown + 1
-                item.loaded, item.classesRead = nil, nil -- read again next time: the stats may come later
+                ns.Items.Retry(item) -- the stats may come later: read again, now and then
             end
             local entry = keep and (evaluate(item, plain, slot) or global and { item = item, roles = {}, slot = slot })
             if entry then
@@ -256,7 +265,9 @@ function Filter.Run(o)
             end
         end
     end
+    local sortStart = debugprofilestop and debugprofilestop() or 0
     table.sort(list, compare(Filter.SortFor(o.sort, o.slot)))
+    Filter.perf = { sort = (debugprofilestop and debugprofilestop() or 0) - sortStart, items = #ns.Source.Drops() }
     return list, unknown
 end
 

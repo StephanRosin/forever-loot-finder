@@ -781,5 +781,15 @@ do
     Rules.ReadChar()
 end
 
+-- An item without stats is read again at most every Items.RETRY seconds (each read made the
+-- client answer and each answer rebuilt the list: a loop in game).
+do
+    local it = { id = 1, loaded = true }
+    check("retry: the first time", ns.Items.Retry(it), true)
+    it.loaded = true
+    check("retry: not again at once", ns.Items.Retry(it), false)
+    check("retry: stays loaded meanwhile", it.loaded, true)
+end
+
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

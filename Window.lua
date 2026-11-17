@@ -859,8 +859,10 @@ function Window.Draw()
 end
 
 -- Runs the filter anew and draws.
+local lastUpdate
 function Window.Update()
     if not frame or not frame:IsShown() then return end
+    local started = ns.perf and debugprofilestop()
     for _, chip in ipairs(chips) do paintChip(chip) end
     frame.classChip.fill:SetVertexColor(0, 0, 0, 0)
     paintText(frame.classChip.text, nil, classColor(currentClass()))
@@ -882,7 +884,9 @@ function Window.Update()
     if ns.Source.Ready() then
         local o = Filter.Options({ class = currentClass(), roles = roles(), slot = state.slot,
             invSlot = state.invSlot, text = state.text, better = ownClass() and S("filterBetter") })
+        local runStart = ns.perf and debugprofilestop()
         entries, unknown = Filter.Run(o)
+        if ns.perf then ns.perf.run = debugprofilestop() - runStart end
         -- Other filters, another list: back to its top (items arriving keep the place).
         local sig = signature(o)
         if sig ~= state.sig then state.sig, state.offset = sig, 0 end
@@ -906,6 +910,14 @@ function Window.Update()
     if unknown > 0 then foot = foot .. "   ·   " .. L.UNKNOWN_ITEMS:format(unknown) end
     frame.footer:SetText(foot)
     Window.Draw()
+    -- /flf perf: what each rebuild costs and how often it comes.
+    if started and ns.perf.run then
+        local now, p = GetTime(), Filter.perf or {}
+        print(("|cff33ff99FLF perf|r update %.0f ms (filter %.0f, sort %.0f) · %d drops → %d rows, %d unknown · %s"):format(
+            debugprofilestop() - started, ns.perf.run, p.sort or 0, p.items or 0, #entries, unknown,
+            lastUpdate and ("%.1f s since the last"):format(now - lastUpdate) or "first"))
+        lastUpdate, ns.perf.run = now, nil
+    end
 end
 
 -- Fonts, colours and art from the theme.

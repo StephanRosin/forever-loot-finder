@@ -167,6 +167,16 @@ function Items.Worn(invSlot)
     return item
 end
 
+-- A loaded item without stats read again (Forever's new crafts get them later), at most every
+-- Items.RETRY seconds: each read makes the client answer, and each answer rebuilt the list.
+Items.RETRY = 30
+function Items.Retry(item)
+    if (item.retryAt or 0) > GetTime() then return false end
+    item.retryAt = GetTime() + Items.RETRY
+    item.loaded, item.classesRead = nil, nil
+    return true
+end
+
 function Items.OnLoaded(fn) listeners[#listeners + 1] = fn end
 
 -- Forgets what was not loaded yet (the tests).
@@ -185,10 +195,17 @@ end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+-- Only answers to what we asked matter: other addons and the bags ask too.
 events:SetScript("OnEvent", function(_, _, id, ok)
     local item = id and cache[id]
-    if item then
-        if ok == false then item.failed = true else item.loaded, item.classesRead = nil, nil end
+    if not item or not asked[id] then return end
+    -- Only news rebuild the list: an item the client still cannot read answers again on
+    -- every read, and every rebuild reads it (a loop of rebuilds in game).
+    if ok == false then
+        if not item.failed then item.failed = true; notify() end
+    elseif not item.loaded then
+        if Items.Full(item).loaded then notify() end
+    elseif not ns.Rules.HasStats(item.stats) and Items.Retry(item) then
+        notify()
     end
-    if id then notify() end
 end)
