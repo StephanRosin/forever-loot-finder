@@ -30,6 +30,7 @@ Settings.DEFAULTS = {
     filterAlternatives = true,  -- with "better": the unclear ones too
     sort = "POINTS",            -- Filter.SORTS
     advanced = false,           -- options: the page with the point weights
+    dynamic = true,             -- hit and crit weighed from the character (Rules.ReadChar)
 }
 
 Settings.RANGES = {

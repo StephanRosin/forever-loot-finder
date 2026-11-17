@@ -136,7 +136,8 @@ Rules.CLASS_PROFILES = {
     WARRIOR = { MELEE = { noMana = true }, TANK = { noMana = true } },
 }
 
-local profiles, defaults = {}, {}
+local profiles, defaults, dynamics = {}, {}, {}
+local dynamic
 
 -- The player's own weights (options, "Advanced"): ForeverLootFinderDB.weights["CLASS:ROLE"] = { stat = weight },
 -- only those that differ from the default.
@@ -187,7 +188,7 @@ function Rules.SetWeight(class, role, stat, weight)
         db.weights[key] = nil
     end
     if not next(db.weights) then db.weights = nil end
-    profiles = {}
+    profiles, dynamics = {}, {}
 end
 
 -- Whether the player weighs this class and role differently.
@@ -196,8 +197,108 @@ function Rules.HasCustom(class, role) return custom(class, role) ~= nil end
 -- All of the player's weights back to the defaults.
 function Rules.ResetWeights()
     ns.DB().weights = nil
-    profiles = {}
+    profiles, dynamics = {}, {}
 end
+
+-- Hit and crit of the player's own damage roles follow the character (option "dynamic"):
+-- what 1% is worth in the role's damage stat (spell power, attack power) at today's
+-- damage, crit and hit, and hit only up to the cap against a raid boss (three levels up).
+-- Each role: its damage stat, hit and crit keys, the cap in percent and the combat ratings.
+Rules.DYNAMIC = {
+    CASTER = { unit = "SPELLDMG", hit = { "HIT", "SHIT" }, crit = { "CRIT", "SCRIT" }, cap = 16, crHit = 8, crCrit = 11 },
+    MELEE = { unit = "AP", hit = { "HIT" }, crit = { "CRIT" }, cap = 9, crHit = 6, crCrit = 9 },
+    RANGED = { unit = "RAP", hit = { "HIT", "RHIT" }, crit = { "CRIT", "RCRIT" }, cap = 9, crHit = 7, crCrit = 10 },
+}
+-- The caster's main nuke per school (GetSpellBonusDamage index: 3 fire, 4 nature, 5 frost, 6 shadow,
+-- 7 arcane) and its spell power coefficient; the damage comes from the highest rank known, as the
+-- game describes it (Forever's text holds the spell power from items and buffs already). Among several, the school with the most spell power. Crits do double damage
+-- (Shadowform, Ice Shards, Ruin, Vengeance, Elemental Fury).
+Rules.CASTER_SPELLS = {
+    MAGE = { { 116, 5, 0.814 }, { 133, 3, 1.0 } },          -- Frostbolt, Fireball
+    WARLOCK = { { 686, 6, 0.857 }, { 5676, 3, 0.429 } },   -- Shadow Bolt, Searing Pain
+    PRIEST = { { 8092, 6, 0.429 } },                       -- Mind Blast
+    DRUID = { { 2912, 7, 1.0 }, { 5176, 4, 0.571 } },      -- Starfire, Wrath
+    SHAMAN = { { 403, 4, 0.794 } },                        -- Lightning Bolt
+}
+
+-- The class's nuke: its whole damage in spell power (the described damage over the coefficient)
+-- and its school; nil when none is known or its text is not loaded yet.
+function Rules.Nuke(class)
+    local best
+    for _, s in ipairs(Rules.CASTER_SPELLS[class] or {}) do
+        local info = C_Spell and C_Spell.GetSpellInfo(s[1])
+        local top = info and C_Spell.GetSpellInfo(info.name)   -- by name: the highest rank known
+        local text = top and C_Spell.GetSpellDescription(top.spellID) or ""
+        local lo, hi = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):match("(%d+)%s+%a+%s+(%d+)")
+        local sp = GetSpellBonusDamage(s[2]) or 0
+        if lo and (not best or sp > best.sp) then
+            best = { school = s[2], sp = sp, damage = (lo + hi) / 2 / s[3] }
+        end
+    end
+    return best
+end
+
+local RATING_PER_PCT = { hit = 10, crit = 14 }   -- without own rating to measure by
+
+-- The rating that makes one percent: measured on the character, else the usual.
+local function perPct(cr, fallback)
+    local r, b = GetCombatRating and GetCombatRating(cr) or 0, GetCombatRatingBonus and GetCombatRatingBonus(cr) or 0
+    return (r > 0 and b > 0) and r / b or fallback
+end
+
+-- The player's damage, hit and crit per damage role, read fresh (each search); nil: fixed weights.
+function Rules.ReadChar()
+    Rules.char = nil
+    dynamics = {}
+    if not (ns.Settings and ns.Settings.Get("dynamic")) or not GetCombatRatingBonus then return end
+    local _, class = UnitClass("player")
+    local nuke = Rules.Nuke(class)
+    local speed = UnitAttackSpeed("player") or 2
+    local min, max = UnitDamage("player")
+    local rSpeed, rMin, rMax = UnitRangedDamage("player")
+    -- Whole damage in the role's stat: a swing is worth its damage as attack power over 14 per second.
+    local base = {
+        CASTER = nuke and nuke.damage or 0,
+        MELEE = ((min or 0) + (max or 0)) / 2 * 14 / speed,
+        RANGED = (rSpeed or 0) > 0 and ((rMin or 0) + (rMax or 0)) / 2 * 14 / rSpeed or 0,
+    }
+    local hitMod = { CASTER = GetSpellHitModifier, MELEE = GetHitModifier, RANGED = GetRangedHitModifier }
+    local critNow = { CASTER = GetSpellCritChance, MELEE = GetCritChance, RANGED = GetRangedCritChance }
+    Rules.char = { class = class }
+    for role, d in pairs(Rules.DYNAMIC) do
+        local hit = (GetCombatRatingBonus(d.crHit) or 0) + (hitMod[role] and hitMod[role]() or 0)
+        local crit = (critNow[role] and critNow[role](nuke and nuke.school) or 0) / 100   -- spell crit of the nuke's school
+        local hitPerPct, critPerPct = perPct(d.crHit, RATING_PER_PCT.hit), perPct(d.crCrit, RATING_PER_PCT.crit)
+        Rules.char[role] = {
+            hitPct = hit, missing = math.max(0, d.cap - hit),
+            over = (hit - d.cap) * hitPerPct,                       -- rating over the cap (negative: missing)
+            -- 1% more hit: one hit in (99% - what is missing) more; 1% crit: one hit more in (1 + crit), crits doubling.
+            hitValue = base[role] * 0.01 / (0.99 - math.max(0, d.cap - hit) / 100),
+            critValue = base[role] * 0.01 / (1 + crit),
+            hitPerPct = hitPerPct, critPerPct = critPerPct,
+        }
+    end
+end
+
+-- The dynamic hit and crit weights of a role for a class, nil when fixed: another class
+-- (a twink in the list), healers and tanks, or the option off. Own weights stay the player's.
+function dynamic(class, role)
+    local c, d = Rules.char, Rules.DYNAMIC[role]
+    if not (c and d and c[role] and c.class == class and (c[role].hitValue or 0) > 0) then return nil end
+    local key = class .. role
+    if dynamics[key] ~= nil then return dynamics[key] or nil end
+    local p, own, ch = Rules.Profile(class, role), custom(class, role) or {}, c[role]
+    local unit = p.weights[d.unit] or 0
+    local w = { hit = {}, weights = {}, over = ch.over, char = ch }
+    for _, k in ipairs(d.hit) do
+        w.hit[k] = true
+        w.weights[k] = own[k] or ch.hitValue * unit / ch.hitPerPct
+    end
+    for _, k in ipairs(d.crit) do w.weights[k] = own[k] or ch.critValue * unit / ch.critPerPct end
+    dynamics[key] = unit > 0 and w or false
+    return dynamics[key] or nil
+end
+Rules.Dynamic = dynamic
 
 -- The weighable stats in the options' order.
 Rules.WEIGHT_KEYS = { "HEAL", "SPELLDMG", "MP5", "INT", "SPI", "STA", "STR", "AGI", "AP", "RAP", "FAP", "DPS",
@@ -369,35 +470,61 @@ local function schoolDamage(p, class, stats)
     return best
 end
 
--- An item's points and main stat for a role, fitting or not.
-function Rules.Points(role, stats, class)
-    local p = Rules.Profile(class, role)
+-- What the points are made of: { { key, points } }, unsorted. With dynamic weights hit counts
+-- only up to the cap: room is the hit rating the item can still use (nil: the item is worn,
+-- its own hit is part of today's and only what is over the cap is lost).
+local function parts(role, stats, class, room)
+    local p, d = Rules.Profile(class, role), dynamic(class, role)
+    local list, hit, key = {}, 0, nil
     local school = schoolDamage(p, class, stats)
-    local points = school * (p.weights.SPELLDMG or 0)
-    for k, v in pairs(stats) do points = points + v * (p.weights[k] or 0) end
+    if school > 0 and (p.weights.SPELLDMG or 0) > 0 then list[#list + 1] = { "SPELLDMG", school * p.weights.SPELLDMG } end
+    for k, v in pairs(stats) do
+        local w = d and d.weights[k] or p.weights[k] or 0
+        if d and d.hit[k] then hit, key = hit + v, k
+        elseif w ~= 0 and v ~= 0 then list[#list + 1] = { k, v * w } end
+    end
+    if hit > 0 then
+        local counted = math.max(0, math.min(hit, room or hit - math.max(0, d.over)))
+        if counted > 0 then list[#list + 1] = { key, counted * d.weights[key] } end
+    end
+    return list
+end
+
+-- The hit rating an item in a slot can still use for a role: what the worn one (the least of
+-- several) gives back, plus what is missing to the cap; nil without dynamic weights.
+function Rules.HitRoom(role, class, wornList)
+    local d = dynamic(class, role)
+    if not d then return nil end
+    local worn
+    for _, w in ipairs(wornList or {}) do
+        local h = 0
+        for k in pairs(d.hit) do h = h + (w.stats and w.stats[k] or 0) end
+        worn = math.min(worn or h, h)   -- shortcut: the ring or trinket least in hit, not the one replaced
+    end
+    return math.max(0, (wornList and wornList.empty and 0 or worn or 0) - d.over)
+end
+
+-- An item's points and main stat for a role, fitting or not.
+function Rules.Points(role, stats, class, room)
+    local p = Rules.Profile(class, role)
+    local points = 0
+    for _, part in ipairs(parts(role, stats, class, room)) do points = points + part[2] end
     local main = p.main and (stats[p.main] or 0) or nil
-    if main and p.main == "SPELLDMG" then main = main + school end
+    if main and p.main == "SPELLDMG" then main = main + schoolDamage(p, class, stats) end
     return points, main
 end
 
--- What the points are made of: { { key, points } }, biggest first (the tooltip's sum).
-function Rules.PointParts(role, stats, class)
-    local p = Rules.Profile(class, role)
-    local parts = {}
-    local school = schoolDamage(p, class, stats)
-    if school > 0 and (p.weights.SPELLDMG or 0) > 0 then parts[#parts + 1] = { "SPELLDMG", school * p.weights.SPELLDMG } end
-    for k, v in pairs(stats) do
-        local w = p.weights[k] or 0
-        if w ~= 0 and v ~= 0 then parts[#parts + 1] = { k, v * w } end
-    end
-    table.sort(parts, function(a, b) return a[2] > b[2] end)
-    return parts
+-- The same, biggest first (the tooltip's sum).
+function Rules.PointParts(role, stats, class, room)
+    local list = parts(role, stats, class, room)
+    table.sort(list, function(x, y) return x[2] > y[2] end)
+    return list
 end
 
 -- How an item serves a role of a class: fits (a wanted stat, no excluded
 -- one), its points and its main stat. A healing item (more healing than
 -- damage) is out for casters; a school's damage is out for all but its casters.
-function Rules.ForRole(role, stats, class)
+function Rules.ForRole(role, stats, class, room)
     local p = Rules.Profile(class, role)
     local own = p.schools and Rules.CLASS_SCHOOLS[class] or {}
     local fits, school = false, schoolDamage(p, class, stats)
@@ -416,7 +543,7 @@ function Rules.ForRole(role, stats, class)
     if p.noMana and (stats.INT or 0) + (stats.SPI or 0) > (stats.STR or 0) + (stats.AGI or 0) + (stats.AP or 0) / 2 then
         return false, 0, 0
     end
-    local points, main = Rules.Points(role, stats, class)
+    local points, main = Rules.Points(role, stats, class, room)
     return fits, points, main
 end
 

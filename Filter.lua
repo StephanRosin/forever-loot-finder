@@ -123,20 +123,23 @@ local function evaluate(item, o, slot)
             if not any then return nil end
         end
     else
+        local wornHere = slot and o.worn and o.worn(slot)
+        if wornHere and twoHanded(item, slot) then wornHere = bothHands(wornHere, o.worn(Rules.SLOT.OFFHAND)) end
         for _, role in ipairs(Rules.ROLES) do
             -- Warriors and paladins tank with a shield: no two-handers (bears may).
             local twoHandTank = role == "TANK" and item.equipLoc == "INVTYPE_2HWEAPON" and o.class ~= "DRUID"
             if o.roles[role] and not twoHandTank then
-                local fits, points, main = Rules.ForRole(role, stats, o.class)
+                local room = Rules.HitRoom(role, o.class, wornHere)
+                local fits, points, main = Rules.ForRole(role, stats, o.class, room)
                 -- Tanks need hit too: on request hit items count (points > 0: nothing excluded).
                 local hit = role == "TANK" and o.tankHit and (stats.HIT or 0) > 0
                 if hit then fits, entry.hit = fits or points > 0, stats.HIT end
-                if fits then entry.roles[#entry.roles + 1] = { role = role, points = points, main = main } end
+                if fits then entry.roles[#entry.roles + 1] = { role = role, points = points, main = main, room = room } end
             end
         end
         if #entry.roles == 0 then return nil end
         for _, r in ipairs(entry.roles) do
-            if not entry.points or r.points > entry.points then entry.points, entry.pointsRole = r.points, r.role end
+            if not entry.points or r.points > entry.points then entry.points, entry.pointsRole, entry.pointsRoom = r.points, r.role, r.room end
         end
     end
     if not o.better then return entry end
@@ -197,6 +200,7 @@ end
 -- Returns the entries ({ item, drops, roles, verdict, delta, unclear }),
 -- and how many items the client does not know.
 function Filter.Run(o)
+    Rules.ReadChar()
     local list, seen, unknown = {}, {}, 0
     local text = o.text and o.text ~= "" and o.text:lower() or nil
     -- A search is global: every source, slot, class and role; only the name counts.

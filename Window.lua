@@ -417,7 +417,7 @@ local function newRow(parent)
         -- Where the points come from.
         if e.points and e.item.stats then
             local parts = {}
-            for _, p in ipairs(Rules.PointParts(e.pointsRole, e.item.stats, currentClass())) do
+            for _, p in ipairs(Rules.PointParts(e.pointsRole, e.item.stats, currentClass(), e.pointsRoom)) do
                 parts[#parts + 1] = ("%s %s"):format(L["STAT_" .. p[1]] or p[1], (("%.1f"):format(p[2]):gsub("%.0$", "")))
             end
             GameTooltip:AddLine(" ")
@@ -425,6 +425,12 @@ local function newRow(parent)
                 (("%.1f"):format(e.points):gsub("%.0$", ""))), 1, 0.82, 0)
             GameTooltip:AddLine(table.concat(parts, " + "), 0.85, 0.85, 0.85, true)
             if Rules.HasCustom(currentClass(), e.pointsRole) then GameTooltip:AddLine(L.POINTS_CUSTOM, 0.6, 0.6, 0.6) end
+            local dyn = Rules.Dynamic(currentClass(), e.pointsRole)
+            if dyn then
+                local unit = L["STAT_" .. Rules.DYNAMIC[e.pointsRole].unit]
+                GameTooltip:AddLine(L.POINTS_DYNAMIC:format(dyn.char.missing, dyn.char.hitValue, unit, dyn.char.critValue, unit),
+                    0.6, 0.6, 0.6, true)
+            end
             if e.item.onUse then
                 GameTooltip:AddLine(L.USE_COUNTED:format(Rules.USE_SHARE * 100), 0.6, 0.6, 0.6, true)
             end
@@ -955,7 +961,7 @@ Settings.OnChange(function(key)
     if not frame then return end
     if key == nil or key == "theme" or key == "themeColors" then Window.Restyle()
     elseif key == "roles" or key:find("^filter") or key == "sort" then Window.Relayout()
-    elseif key == "weights" and Window.IsShown() then Window.Update() end
+    elseif (key == "weights" or key == "dynamic") and Window.IsShown() then Window.Update() end
 end)
 
 Items.OnLoaded(function() if Window.IsShown() then Window.Update() end end)

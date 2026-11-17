@@ -69,6 +69,13 @@ Install both, and keep AtlasLoot's Dungeons and Raids, Crafting and Collections 
 - **Defaults for this role** and **All weights to defaults** bring the standard weights back.
 - Which stats a role wants or excludes stays fixed (casters never see attack power items, for example).
 
+## Hit and crit from your character
+- For your own damage roles, hit and crit are weighed from your character instead of fixed numbers: 1% is worth more the more damage you do.
+- Casters: the damage of your main nuke (highest rank you know, as its tooltip shows it) and your crit chance in its school; crits count as double damage.
+- Hit only counts up to the cap against raid bosses (spells 16%, melee and ranged 9%): at the cap, more hit is worth nothing.
+- The points tooltip shows how far you are from the cap and what 1% hit and crit are worth. Healers, tanks and other classes keep fixed weights; your own weights always win.
+- Switch it off under Options → General → Advanced.
+
 ## Where to find it
 The minimap button, `/flf`, or Blizzard's addon compartment.
 

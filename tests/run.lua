@@ -731,5 +731,49 @@ for _, k in ipairs({ "ROLE_DPS", "ROLE_MELEE_DPS", "ROLE_CASTER_DPS", "STAT_FROS
     check("deDE " .. k, de[k] ~= nil, true)
 end
 
+-- Dynamic hit and crit: a mage with 300 spell power, 10% spell hit (from 100 rating), 10% crit.
+do
+    local near = function(a, b) return math.abs(a - b) < 0.01 end
+    local hitBonus = 10
+    M.state.class = "MAGE"
+    GetCombatRating = function(cr) return cr == 8 and hitBonus * 10 or 0 end
+    GetCombatRatingBonus = function(cr) return cr == 8 and hitBonus or 0 end
+    GetSpellBonusDamage = function(school) return school == 5 and 300 or 250 end
+    -- Frostbolt rank 1 (116) by name to the highest rank known (25304): 486 to 528, coefficient 0.814.
+    C_Spell = {
+        GetSpellInfo = function(id) return id == 116 and { name = "Frostbolt", spellID = 116 }
+            or id == "Frostbolt" and { name = "Frostbolt", spellID = 25304 } or id == 133 and { name = "Fireball", spellID = 133 } or nil end,
+        GetSpellDescription = function(id) return id == 25304 and "Launches a bolt of frost, causing |cffffffff486|r to 528 Frost damage." or "" end,
+    }
+    GetSpellHitModifier, GetHitModifier, GetRangedHitModifier = function() return 0 end, function() return 0 end, function() return 0 end
+    GetSpellCritChance, GetCritChance, GetRangedCritChance = function() return 10 end, function() return 5 end, function() return 5 end
+    UnitAttackSpeed = function() return 2 end
+    UnitDamage = function() return 100, 140 end
+    UnitRangedDamage = function() return 0, 0, 0 end
+    Rules.ReadChar()
+    local B = 507 / 0.814
+    check("dynamic: Frostbolt as the mage's nuke", near(Rules.Nuke("MAGE").damage, B), true)
+    check("dynamic: hit 6% short", Rules.char.CASTER.missing, 6)
+    check("dynamic: 2% hit counts in full", near(Rules.Points("CASTER", { HIT = 20 }, "MAGE", 60), 20 * B / 100 / 0.93 / 10), true)
+    check("dynamic: hit over the cap is lost", near(Rules.Points("CASTER", { HIT = 100 }, "MAGE", 60), 60 * B / 100 / 0.93 / 10), true)
+    check("dynamic: crit from damage", near(Rules.Points("CASTER", { SCRIT = 14 }, "MAGE"), B / 100 / 1.1), true)
+    check("dynamic: other classes keep fixed weights", Rules.Points("CASTER", { HIT = 10 }, "WARLOCK"), 12)
+    check("dynamic: room from worn and missing", Rules.HitRoom("CASTER", "MAGE", { { stats = { SHIT = 30 } } }), 90)
+    Rules.SetWeight("MAGE", "CASTER", "HIT", 2)
+    check("dynamic: own weight wins", Rules.Points("CASTER", { HIT = 10 }, "MAGE", 60), 20)
+    Rules.ResetWeights()
+    hitBonus = 16
+    Rules.ReadChar()
+    check("dynamic: at the cap new hit is worthless", Rules.Points("CASTER", { HIT = 20 }, "MAGE", Rules.HitRoom("CASTER", "MAGE", {})), 0)
+    check("dynamic: worn hit counts at the cap", near(Rules.Points("CASTER", { HIT = 20 }, "MAGE"), 20 * B / 100 / 0.99 / 10), true)
+    check("dynamic: melee crit from swing damage", near(Rules.Points("MELEE", { CRIT = 14 }, "MAGE"), 120 * 7 * 0.01 / 1.05 * 0.5), true)
+    ns.Settings.Set("dynamic", false)
+    Rules.ReadChar()
+    check("dynamic off: fixed weights", Rules.Points("CASTER", { HIT = 20 }, "MAGE"), 24)
+    ns.Settings.Set("dynamic", nil)
+    GetCombatRatingBonus, C_Spell, Rules.char, M.state.class = nil, nil, nil, "PRIEST"
+    Rules.ReadChar()
+end
+
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

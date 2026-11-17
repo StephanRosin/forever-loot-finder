@@ -262,6 +262,8 @@ local function generalRows()
             end },
         } },
         { type = "header", label = "OPT_ADVANCED" },
+        check("dynamic", "OPT_DYNAMIC"),
+        { type = "text", label = "OPT_DYNAMIC_HINT", height = 40 },
         check("advanced", "OPT_ADVANCED_SHOW"),
         { type = "text", label = "OPT_ADVANCED_HINT", height = 40 },
         { type = "header", label = "OPT_MINIMAP" },
