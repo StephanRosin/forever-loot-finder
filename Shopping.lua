@@ -72,6 +72,53 @@ end
 
 function Shopping.Has(id) return find(id) ~= nil end
 
+-- Order: "custom" (as the player dragged it), "origin" or "slot" (in the
+-- order of the window's slot bar, what is not worn last); then by name.
+Shopping.SORTS = { "custom", "origin", "slot" }
+function Shopping.Sort() return data().sort or "custom" end
+function Shopping.SetSort(mode)
+    data().sort = mode
+    changed()
+end
+
+-- Moves an item to a place of the custom order.
+function Shopping.Move(id, to)
+    local i, e = find(id)
+    local entries = data().entries
+    if not i or to < 1 or to > #entries or to == i then return end
+    table.remove(entries, i)
+    table.insert(entries, to, e)
+    changed()
+end
+
+local function slotIndex(id)
+    local item = ns.Items.Instant(id)
+    local loc = item and item.equipLoc
+    for i, slot in ipairs(ns.Rules.SLOTS) do
+        for _, l in ipairs(slot.locs or {}) do
+            if l == loc then return i end
+        end
+    end
+    return #ns.Rules.SLOTS + 1
+end
+
+local function nameOf(id) return (ns.Items.Get(id) or {}).name or "" end
+
+function Shopping.Sorted()
+    local list, mode = {}, Shopping.Sort()
+    for i, e in ipairs(data().entries) do list[i] = e end
+    if mode == "custom" then return list end
+    local key = {}
+    for _, e in ipairs(list) do
+        key[e] = mode == "slot" and slotIndex(e.itemID) or (Shopping.Origin(e.itemID) or "\255")
+    end
+    table.sort(list, function(a, b)
+        if key[a] ~= key[b] then return key[a] < key[b] end
+        return nameOf(a.itemID) < nameOf(b.itemID)
+    end)
+    return list
+end
+
 -- Where it comes from, for "Devout Crown (Scholomance)": the first of its
 -- sources in the loot tables; nil when they do not know it.
 function Shopping.Origin(id)

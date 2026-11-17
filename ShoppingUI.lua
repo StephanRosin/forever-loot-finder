@@ -20,6 +20,7 @@ local NOTE_MIN_W, NOTE_MIN_H, NOTE_MAX_W, NOTE_MAX_H = 180, 80, 700, 900
 local NOTE_DEFAULT = { shown = false, x = 300, y = -200, w = 280, h = 220 }
 local DIALOG_W, FIELD_H, SUGGESTION_H = 360, 24, 22
 local CHECK = "Interface\\Buttons\\UI-CheckBox-Check"
+local SORT_ICON = "Interface\\AddOns\\ForeverLootFinder\\Media\\IconSort"
 local GRIP_TEXTURE = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local DONE_COLOUR = { 0.3, 0.9, 0.4 }
 local QUALITY = { [0] = "ff9d9d9d", "ffffffff", "ff1eff00", "ff0070dd", "ffa335ee", "ffff8000" }
@@ -87,6 +88,25 @@ local function newRow(parent, height, size)
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- Custom order: drag a row onto another to put it there.
+    row:RegisterForDrag("LeftButton")
+    row:SetScript("OnDragStart", function(self)
+        if Shopping.Sort() ~= "custom" then return end
+        self.dragging = true
+        self:SetAlpha(0.4)
+    end)
+    row:SetScript("OnDragStop", function(self)
+        if not self.dragging then return end
+        self.dragging = nil
+        self:SetAlpha(1)
+        for _, other in ipairs(self.rows) do
+            if other ~= self and other:IsShown() and other:IsMouseOver() then
+                for i, e in ipairs(Shopping.Entries()) do
+                    if e == other.entry then return Shopping.Move(self.entry.itemID, i) end
+                end
+            end
+        end
+    end)
     return row
 end
 
@@ -111,7 +131,7 @@ end
 
 -- Rows of a list into a frame from offset on, as many as fit; returns how many there are.
 local function layoutRows(holder, rows, height, gap, offset, make)
-    local entries = Shopping.Entries()
+    local entries = Shopping.Sorted()
     local fit = math.max(1, math.floor((holder:GetHeight() + gap) / (height + gap)))
     for i = 1, fit do
         local entry = entries[offset + i]
@@ -119,6 +139,7 @@ local function layoutRows(holder, rows, height, gap, offset, make)
         if entry then
             if not row then
                 row = make()
+                row.rows = rows
                 rows[i] = row
             end
             row:ClearAllPoints()
@@ -151,6 +172,18 @@ function ShoppingUI.LootMenu(owner, id)
             root:CreateButton(L.SHOP_REMOVE, function() Shopping.Remove(id) end)
         else
             root:CreateButton(L.SHOP_ADD_THIS, function() Shopping.Add(id) end)
+        end
+    end)
+end
+
+-- The sticky note's sort button: the order to show.
+function ShoppingUI.SortMenu(owner)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        root:CreateTitle(L.SHOP_SORT)
+        for _, mode in ipairs(Shopping.SORTS) do
+            root:CreateRadio(L["SHOP_SORT_" .. mode:upper()], function() return Shopping.Sort() == mode end,
+                function() Shopping.SetSort(mode) end)
         end
     end)
 end
@@ -322,6 +355,26 @@ function ShoppingUI.BuildPanel(window)
     panel.noteChip = U.Chip(panel, L.SHOP_NOTE, function() return (Shopping.Note() or {}).shown == true end,
         function(on) ShoppingUI.ShowNote(on) end)
     panel.noteChip:SetPoint("LEFT", panel.add, "RIGHT", 6, 0)
+    panel.sortLabel = U.Text(panel, 12, "muted")
+    panel.sortLabel:SetPoint("LEFT", panel.noteChip, "RIGHT", 18, 0)
+    panel.sortLabel:SetText(L.SHOP_SORT)
+    panel.sorts = {}
+    local last = panel.sortLabel
+    for _, mode in ipairs(Shopping.SORTS) do
+        local chip = U.Chip(panel, L["SHOP_SORT_" .. mode:upper()], function() return Shopping.Sort() == mode end,
+            function() Shopping.SetSort(mode) end, { dot = true })
+        chip:SetPoint("LEFT", last, "RIGHT", 6, 0)
+        if mode == "custom" then
+            chip:HookScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:SetText(L.SHOP_SORT_CUSTOM_TIP, 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            chip:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+        panel.sorts[#panel.sorts + 1] = chip
+        last = chip
+    end
     panel.sum = U.Text(panel, 13, "title")
     panel.sum:SetPoint("RIGHT", panel, "TOPRIGHT", 0, -11)
     panel.empty = U.Text(panel, 13, "muted")
@@ -349,6 +402,7 @@ local function refreshPanel()
     layoutRows(panel.list, panel.rows, PANEL_ROW, 4, panel.offset, function() return newRow(panel.list, PANEL_ROW, 13) end)
     ui().paintChip(panel.add)
     ui().paintChip(panel.noteChip)
+    for _, chip in ipairs(panel.sorts) do ui().paintChip(chip) end
 end
 
 -- The sticky note -------------------------------------------------------------
@@ -424,8 +478,22 @@ local function buildNote()
     note.fold:SetPoint("RIGHT", note.close, "LEFT", -2, 0)
     note.add = titleButton(note.bar, "+", L.SHOP_ADD, function() ShoppingUI.OpenAdd() end)
     note.add:SetPoint("RIGHT", note.fold, "LEFT", -2, 0)
+    note.sort = titleButton(note.bar, "", L.SHOP_SORT_MENU, function(self) ShoppingUI.SortMenu(self) end)
+    note.sort:SetPoint("RIGHT", note.add, "LEFT", -2, 0)
+    note.sort.icon = note.sort:CreateTexture(nil, "ARTWORK")
+    note.sort.icon:SetSize(14, 14)
+    note.sort.icon:SetPoint("CENTER")
+    note.sort.icon:SetTexture(SORT_ICON)
+    local function tint(kind)
+        local c = ui().colour(kind)
+        note.sort.icon:SetVertexColor(c[1], c[2], c[3], c[4] or 1)
+    end
+    tint("muted")
+    note.sort:HookScript("OnEnter", function() tint("accent") end)
+    note.sort:HookScript("OnLeave", function() tint("muted") end)
+    note.sort.tint = tint
     note.title = U.Text(note.bar, 13, "title")
-    note.title:SetPoint("RIGHT", note.add, "LEFT", -6, 0)
+    note.title:SetPoint("RIGHT", note.sort, "LEFT", -6, 0)
     note.title:SetJustifyH("LEFT")
     note.title:SetWordWrap(false)
     note.list = CreateFrame("Frame", nil, note)
@@ -458,7 +526,7 @@ local function refreshNote()
     local done, total = doneCount()
     note.title:ClearAllPoints()
     note.title:SetPoint("LEFT", note.bar, "LEFT", ns.ThemeArt.TextStart(NOTE_TITLE) or NOTE_PAD, 0)
-    note.title:SetPoint("RIGHT", note.add, "LEFT", -6, 0)
+    note.title:SetPoint("RIGHT", note.sort, "LEFT", -6, 0)
     note.title:SetText(L.SHOP_NOTE_TITLE:format(done, total))
     note.offset = math.max(0, math.min(note.offset, total - 1))
     layoutRows(note.list, note.rows, NOTE_ROW, 2, note.offset, function() return newRow(note.list, NOTE_ROW, 12) end)
@@ -493,7 +561,10 @@ end
 
 function ShoppingUI.Restyle()
     local U = ui()
-    if note then ns.ThemeArt.StyleWindow(note, note.bar) end
+    if note then
+        ns.ThemeArt.StyleWindow(note, note.bar)
+        note.sort.tint("muted")
+    end
     if dialog then
         ns.ThemeArt.StyleWindow(dialog, dialog.bar)
         U.paintEdges(dialog.search.edges, U.colour("muted"), 0.45)

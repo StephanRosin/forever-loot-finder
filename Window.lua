@@ -945,8 +945,10 @@ end
 
 -- Fonts, colours and art from the theme.
 function Window.Restyle()
-    if not frame then return end
+    -- The sticky note and the add dialog follow the theme with the window never opened.
     for _, t in ipairs(texts) do styleText(t) end
+    ns.ShoppingUI.Restyle()
+    if not frame then return end
     ns.ThemeArt.StyleWindow(frame, frame.bar)
     frame.title:ClearAllPoints()
     frame.title:SetPoint("LEFT", frame.bar, "LEFT", ns.ThemeArt.TextStart(TITLE_H) or PAD, 0)
@@ -955,7 +957,6 @@ function Window.Restyle()
     for _, chip in ipairs(chips) do chip:Relabel() end
     frame.search.hint:SetText(L.SEARCH)
     ns.Panel.Restyle()
-    ns.ShoppingUI.Restyle()
     Window.Relayout()
 end
 
@@ -1003,9 +1004,9 @@ function Window.State() return state end
 function Window.Frame() return frame end
 
 Settings.OnChange(function(key)
+    if key == nil or key == "theme" or key == "themeColors" then return Window.Restyle() end
     if not frame then return end
-    if key == nil or key == "theme" or key == "themeColors" then Window.Restyle()
-    elseif key == "roles" or key:find("^filter") or key == "sort" then Window.Relayout()
+    if key == "roles" or key:find("^filter") or key == "sort" then Window.Relayout()
     elseif (key == "weights" or key == "dynamic") and Window.IsShown() then Window.Update() end
 end)
 

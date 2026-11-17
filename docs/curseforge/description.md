@@ -58,7 +58,8 @@ The tab **Shopping list** next to **Loot** keeps the items you are after, per ch
 - **Right-click** an item in the loot list: *Add to the shopping list* (or *Remove*).
 - **+ Add item** searches all items of the loot tables from three letters on (recipes and patterns left out); arrows pick, Enter takes. An item is never listed twice.
 - Each line: icon, name and where it comes from (*Devout Crown (Scholomance)*, *(Crafting)*, *(World drop)*), and how many are in your bags. It ticks itself off once you have it.
-- **Sticky note:** the list as a small window of its own over the game: drag it by its title, size it at its corner, scroll with the wheel, **+** adds, **–** minimises it to its title, **×** hides it. It comes back after logging in.
+- **Sort** by *Custom*, *Origin* or *Slot* (chips in the tab, the sort icon on the sticky note). *Custom*: drag a line onto another to put it there.
+- **Sticky note:** the list as a small window of its own over the game: drag it by its title, size it at its corner, scroll with the wheel, the sort icon picks the order, **+** adds, **–** minimises it to its title, **×** hides it. It comes back after logging in and follows the theme.
 - Inside a dungeon or raid where an item on the list drops, its line gets a frame.
 
 ## Recipes

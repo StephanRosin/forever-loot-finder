@@ -837,6 +837,36 @@ do
     ring.classID = 9
     check("shopping: no patterns", #Shop.Search("spell ring"), 0)
     ring.classID = class
+    -- Sorting: custom (moved by hand), by origin, by slot.
+    Shop.Add(103)
+    Shop.Add(101)
+    local function order()
+        local ids = {}
+        for _, e in ipairs(Shop.Sorted()) do ids[#ids + 1] = e.itemID end
+        return table.concat(ids, ",")
+    end
+    check("sort: custom keeps the order added", order(), "102,103,101")
+    Shop.Move(101, 1)
+    check("sort: moved by hand", order(), "101,102,103")
+    Shop.SetSort("origin")
+    check("sort: by origin (\"Area2717\" before \"The Deadmines\")", order():sub(1, 3), "103")
+    Shop.SetSort("slot")
+    local first = ns.Rules.SLOTS[1].locs[1]
+    check("sort: by slot follows the slot bar", (function()
+        local last = 0
+        for _, e in ipairs(Shop.Sorted()) do
+            local loc = ns.Items.Instant(e.itemID).equipLoc
+            local at = #ns.Rules.SLOTS + 1
+            for i, slot in ipairs(ns.Rules.SLOTS) do for _, l in ipairs(slot.locs) do if l == loc then at = math.min(at, i) end end end
+            if at < last then return false end
+            last = at
+        end
+        return first ~= nil
+    end)(), true)
+    Shop.SetSort("custom")
+    check("sort: custom order kept meanwhile", order(), "101,102,103")
+    Shop.Remove(101)
+    Shop.Remove(103)
     Shop.Remove(102)
     check("shopping: removed", #Shop.Entries(), 0)
 end
