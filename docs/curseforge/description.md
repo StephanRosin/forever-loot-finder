@@ -54,6 +54,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids, Crafting and Collections 
 ## Recipes
 - The panel of a crafted item tells where its recipe comes from: from the trainer, a boss or world drop, a quest, or a vendor with name and zone (only vendors of your faction).
 - A recipe you have already learned shows a green check instead.
+- **Track recipe** beside the reagents puts the recipe into the game's own recipe tracking: the objective tracker (and Forever Quest Log) shows the crafted item with its reagents counted from your bags, like quest objectives.
 - Vendors are listed for your faction only, at most two by name.
 - The sources come from Wowhead's Forever recipe lists; creature, vendor and quest names are in English, zones in your language.
 
