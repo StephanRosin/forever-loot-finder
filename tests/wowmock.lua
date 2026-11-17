@@ -245,7 +245,20 @@ C_Item = {
         return id and M.items[id] and M.items[id].stats or nil
     end,
     RequestLoadItemDataByID = function(id) M.requested[#M.requested + 1] = id end,
+    GetItemCount = function(id) return M.state.bags and M.state.bags[id] or 0 end,
+    GetItemNameByID = function(id)
+        local it = M.items[id]
+        return it and not it.uncached and it.name or nil
+    end,
+    GetItemIconByID = function(id) return "ICON" .. id end,
+    GetItemQualityByID = function(id) return M.items[id] and M.items[id].quality end,
 }
+-- Where the player is: M.state.instance = { name, kind, id } (nil: outside).
+function GetInstanceInfo()
+    local i = M.state.instance
+    if not i then return "Azeroth", "none", 0, "", 0, 0, false, 0 end
+    return i.name, i.kind, 1, "", 5, 0, false, i.id
+end
 -- Tooltip lines: an item's `tip` list of left texts.
 C_TooltipInfo = { GetItemByID = function(id)
     local it = M.items[id]

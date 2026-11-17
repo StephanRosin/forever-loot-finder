@@ -51,6 +51,16 @@ Install both, and keep AtlasLoot's Dungeons and Raids, Crafting and Collections 
 - **Hover** a row for the item's tooltip and, under it, what it gives or takes against what you wear, stat by stat (+14 Spirit, -7 Healing). Hover **Worn now** for the worn item's tooltip.
 - **Shift-click** links the item in chat, **ctrl-click** tries it on.
 
+## Shopping list
+
+The tab **Shopping list** next to **Loot** keeps the items you are after, per character.
+
+- **Right-click** an item in the loot list: *Add to the shopping list* (or *Remove*).
+- **+ Add item** searches all items of the loot tables from three letters on (recipes and patterns left out); arrows pick, Enter takes. An item is never listed twice.
+- Each line: icon, name and where it comes from (*Devout Crown (Scholomance)*, *(Crafting)*, *(World drop)*), and how many are in your bags. It ticks itself off once you have it.
+- **Sticky note:** the list as a small window of its own over the game: drag it by its title, size it at its corner, scroll with the wheel, **+** adds, **–** minimises it to its title, **×** hides it. It comes back after logging in.
+- Inside a dungeon or raid where an item on the list drops, its line gets a frame.
+
 ## Recipes
 - The panel of a crafted item tells where its recipe comes from: from the trainer, a boss or world drop, a quest, or a vendor with name and zone (only vendors of your faction).
 - A recipe you have already learned shows a green check instead.

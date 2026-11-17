@@ -62,7 +62,7 @@ M.items = {
 M.atlas.TheDeadmines = { name = "The Deadmines|TInterface\\ltn4:18|t", ContentType = 1, items = {
     { name = "Cookie", npcID = 1, [1] = { { 1, 101 }, { 2, 102 }, { 3, "INV_Box_01" }, { 4, 105 } } },
 } }
-M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
+M.atlas.MoltenCore = { MapID = 2717, InstanceID = 409, ContentType = 2, items = {
     { name = "Garr", npcID = 2, [2] = { { 1, 103 }, { 2, 104 }, { 3, 107 }, { 4, 106 }, { 5, 110 }, { 6, 111 },
         { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 }, { 12, 120 }, { 13, 121 }, { 14, 122 }, { 15, 123 }, { 16, 124 },
         { 17, 125 }, { 18, 126 }, { 19, 127 }, { 20, 207 }, { 21, 128 }, { 22, 129 } } },
@@ -789,6 +789,115 @@ do
     it.loaded = true
     check("retry: not again at once", ns.Items.Retry(it), false)
     check("retry: stays loaded meanwhile", it.loaded, true)
+end
+
+-- The shopping list: per character, counted from the bags, origin from the loot tables.
+do
+    local Shop = ns.Shopping
+    for _, e in ipairs(Shop.Entries()) do Shop.Remove(e.itemID) end
+    Shop.Add(102)
+    Shop.Add(102, 3)
+    check("shopping: one entry per item", #Shop.Entries(), 1)
+    check("shopping: adding again sets the amount", Shop.Entries()[1].goal, 3)
+    Shop.SetGoal(102, 0)
+    check("shopping: at least one", Shop.Entries()[1].goal, 1)
+    Shop.SetGoal(102, 3)
+    check("shopping: origin is the dungeon", Shop.Origin(102), "The Deadmines")
+    check("shopping: world drop", Shop.Origin(160), ns.L.WORLD_DROP)
+    check("shopping: crafted", Shop.Origin(150), ns.L.FILTER_CRAFTING)
+    M.state.bags = { [102] = 2 }
+    local line = Shop.Line(Shop.Entries()[1])
+    check("shopping: counted from the bags", line.have .. "/" .. line.goal .. " " .. tostring(line.done), "2/3 false")
+    M.state.bags = { [102] = 3 }
+    check("shopping: enough ticks it", Shop.Line(Shop.Entries()[1]).done, true)
+    M.state.bags = nil
+    check("shopping: outside nothing drops here", Shop.DropsHere(102), false)
+    M.state.instance = { name = "The Deadmines", kind = "party", id = 36 }
+    check("shopping: drops in this dungeon (by name)", Shop.DropsHere(102), true)
+    check("shopping: not from another raid", Shop.DropsHere(103), false)
+    M.state.instance = { name = "Geschmolzener Kern", kind = "raid", id = 409 }
+    check("shopping: drops in this raid (by id, any language)", Shop.DropsHere(103), true)
+    M.state.instance = nil
+    check("shopping: search needs three letters", #Shop.Search("ri"), 0)
+    local names = {}
+    for _, r in ipairs(Shop.Search("RING")) do names[#names + 1] = r.name end
+    check("shopping: search ignores case", table.concat(names, ","):find("Spell Ring", 1, true) ~= nil, true)
+    -- The client forgets a name again: the kept one still finds it.
+    local nameByID = C_Item.GetItemNameByID
+    C_Item.GetItemNameByID = function(id) if id ~= 102 then return nameByID(id) end end
+    check("shopping: kept name survives the client forgetting", #Shop.Search("spell ring"), 1)
+    local calls = 0
+    C_Item.GetItemNameByID = function(id) calls = calls + 1 return nameByID(id) end
+    Shop.Search("ring")
+    check("shopping: searching never asks the client", calls, 0)
+    C_Item.GetItemNameByID = nameByID
+    -- Recipes and patterns are not searched.
+    local ring = ns.Items.Get(102)
+    local class = ring.classID
+    ring.classID = 9
+    check("shopping: no patterns", #Shop.Search("spell ring"), 0)
+    ring.classID = class
+    Shop.Remove(102)
+    check("shopping: removed", #Shop.Entries(), 0)
+end
+
+-- The shopping list on screen: the tab, the add dialog, the sticky note.
+do
+    local Shop, SUI = ns.Shopping, ns.ShoppingUI
+    ns.Window.Open()
+    local win = ns.Window.Frame()
+    ns.Window.ShowTab("shop")
+    check("tab: loot hidden", win.body:IsShown(), false)
+    check("tab: shopping shown", win.shop:IsShown(), true)
+    Shop.Add(102, 2)
+    local row = win.shop.rows[1]
+    check("tab: a row per item", row and row:IsShown(), true)
+    check("tab: name with origin", row.name:GetText():find("Spell Ring", 1, true) ~= nil and row.name:GetText():find("(The Deadmines)", 1, true) ~= nil, true)
+    check("tab: count", row.count:GetText(), "0/2")
+    check("tab label counts", win.tabs.shop.text:GetText(), ns.L.TAB_SHOP_COUNT:format(0, 1))
+    SUI.OpenAdd()
+    -- The names arrive a few at a time; each answer is kept.
+    for _ = 1, 50 do
+        local asked = M.requested
+        M.requested = {}
+        for _, id in ipairs(asked) do M.Fire("GET_ITEM_INFO_RECEIVED", id, true) end
+        if #M.timers == 0 then break end
+        M.RunTimers()
+    end
+    local dlg = _G.ForeverLootFinderShoppingAdd
+    dlg.search:SetText("ring")
+    dlg.search:GetScript("OnTextChanged")(dlg.search, true)
+    check("dialog: suggestions from 3 letters", dlg.buttons[1]:IsShown(), true)
+    dlg.search:GetScript("OnEnterPressed")(dlg.search)
+    check("dialog: Enter takes the first", #Shop.Entries(), 2)
+    check("dialog: found items once", Shop.Entries()[2].goal, 1)
+    SUI.OpenAdd()
+    dlg.search:SetText("ring")
+    dlg.search:GetScript("OnTextChanged")(dlg.search, true)
+    check("dialog: listed ones marked", dlg.buttons[1].text:GetText():find(ns.L.SHOP_LISTED, 1, true) ~= nil, true)
+    dlg.search:GetScript("OnEnterPressed")(dlg.search)
+    check("dialog: never twice", #Shop.Entries(), 2)
+    check("dialog: closed", dlg:IsShown(), false)
+    SUI.ShowNote(true)
+    local note = _G.ForeverLootFinderShoppingNote
+    check("note: shown", note:IsShown(), true)
+    check("note: saved per character", Shop.Note().shown, true)
+    M.state.instance = { name = "The Deadmines", kind = "party", id = 36 }
+    SUI.Refresh()
+    check("note: framed where it drops", note.rows[1].edges[1]._vertex[4] > 0, true)
+    M.state.instance = nil
+    SUI.Refresh()
+    check("note: no frame outside", note.rows[1].edges[1]._vertex[4], 0)
+    local openH = note:GetHeight()
+    note.fold:GetScript("OnClick")(note.fold)
+    check("note: minimised to its title", note.list:IsShown() == false and note:GetHeight() < openH, true)
+    note.fold:GetScript("OnClick")(note.fold)
+    check("note: expanded at its height", note.list:IsShown() and note:GetHeight() == openH, true)
+    SUI.ShowNote(false)
+    check("note: hidden", note:IsShown(), false)
+    for _, e in ipairs(Shop.Entries()) do Shop.Remove(e.itemID) end
+    ns.Window.ShowTab("loot")
+    check("tab: loot again", win.body:IsShown(), true)
 end
 
 print(("%d passed, %d failed"):format(pass, fail))

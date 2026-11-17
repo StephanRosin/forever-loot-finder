@@ -179,8 +179,8 @@ function Source.ReadAtlasLoot(module)
                     bossItems(boss, function(id)
                         if seen[id] then return end
                         seen[id] = true
-                        list[#list + 1] = { item = id, instance = instance, boss = bossName or "?",
-                            npcID = npcID, raid = raid, forever = forever or newBoss,
+                        list[#list + 1] = { item = id, instance = instance, instanceID = content.InstanceID,
+                            boss = bossName or "?", npcID = npcID, raid = raid, forever = forever or newBoss,
                             rate = dropRate(npcID, id) }
                     end)
                 end

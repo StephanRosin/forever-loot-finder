@@ -270,7 +270,7 @@ local function buildSlots(y)
     local n = #Rules.SLOTS
     local gap = (WIDTH - 2 * PAD - n * SLOT_SIZE) / (n - 1)
     for i, slot in ipairs(Rules.SLOTS) do
-        local b = CreateFrame("Button", nil, frame)
+        local b = CreateFrame("Button", nil, frame.body)
         b:SetSize(SLOT_SIZE, SLOT_SIZE)
         b:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + (i - 1) * (SLOT_SIZE + gap), y)
         -- Selected: an accent halo behind, the icon inset in it, a bar under it.
@@ -383,6 +383,10 @@ local function newRow(parent)
     row:SetScript("OnClick", function(self, button)
         local e = self.entry
         if not e then return end
+        if button == "RightButton" then
+            ns.ShoppingUI.LootMenu(self, e.item.id)
+            return
+        end
         local link = e.item.link
         if link and IsModifiedClick and (IsModifiedClick("CHATLINK") or IsModifiedClick("DRESSUP"))
             and HandleModifiedItemClick then
@@ -535,7 +539,7 @@ end
 Window.UI.closeButton = closeButton
 
 local function buildList()
-    local list = CreateFrame("Frame", nil, frame)
+    local list = CreateFrame("Frame", nil, frame.body)
     list:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PAD, FOOTER_H)
     list:EnableMouseWheel(true)
     list:SetScript("OnMouseWheel", function(_, delta)
@@ -575,7 +579,7 @@ local function buildList()
 end
 
 local function buildWorn()
-    local w = CreateFrame("Frame", nil, frame)
+    local w = CreateFrame("Frame", nil, frame.body)
     w:SetHeight(ROW_H)
     w.back = fill(w, "BACKGROUND")
     w.back:SetAllPoints()
@@ -634,8 +638,22 @@ local function build()
     frame.gear.icon:SetTexture("Interface\\Buttons\\UI-OptionsButton")
     frame.gear:SetScript("OnClick", function() ns.Options.Toggle() end)
 
+    -- Two tabs: the loot (everything below in body) and the shopping list.
+    local body = CreateFrame("Frame", nil, frame)
+    body:SetAllPoints()
+    frame.body = body
+    frame.tabs = {
+        shop = Chip(bar, function() return ns.ShoppingUI.TabLabel() end, function() return state.tab == "shop" end,
+            function() Window.ShowTab("shop") end, { dot = true }),
+        loot = Chip(bar, L.TAB_LOOT, function() return state.tab ~= "shop" end, function() Window.ShowTab("loot") end,
+            { dot = true }),
+    }
+    frame.tabs.shop:SetPoint("RIGHT", frame.gear, "LEFT", -8, 0)
+    frame.tabs.loot:SetPoint("RIGHT", frame.tabs.shop, "LEFT", -CHIP_GAP, 0)
+    frame.shop = ns.ShoppingUI.BuildPanel(frame)
+
     -- Row 1: class, roles, search.
-    frame.classChip = Chip(frame, function() return className(currentClass()) end, function() return true end, nil,
+    frame.classChip = Chip(body, function() return className(currentClass()) end, function() return true end, nil,
         { dot = true })
     frame.classChip:SetScript("OnClick", function()
         frame.classMenu:SetShown(not frame.classMenu:IsShown())
@@ -644,10 +662,10 @@ local function build()
     frame.classMenu:SetPoint("TOPLEFT", frame.classChip, "BOTTOMLEFT", 0, -2)
     frame.roleChips = {}
     for _, role in ipairs(Rules.ROLES) do
-        frame.roleChips[role] = Chip(frame, function() return L[Rules.RoleLabelKey(currentClass(), role)] end, function() return roles()[role] == true end,
+        frame.roleChips[role] = Chip(body, function() return L[Rules.RoleLabelKey(currentClass(), role)] end, function() return roles()[role] == true end,
             function(v) setRole(role, v) end)
     end
-    local box = CreateFrame("EditBox", "ForeverLootFinderSearch", frame)
+    local box = CreateFrame("EditBox", "ForeverLootFinderSearch", body)
     box:SetSize(170, CHIP_H)
     box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10))
     box:SetAutoFocus(false)
@@ -680,7 +698,7 @@ local function build()
         local out = {}
         for _, f in ipairs(list) do
             local get, set = setting(f[1])
-            out[#out + 1] = Chip(frame, function() return L[f[2]] end, get, set)
+            out[#out + 1] = Chip(body, function() return L[f[2]] end, get, set)
         end
         return out
     end
@@ -695,13 +713,13 @@ local function build()
 
     -- Row 3: the slots, their name under them.
     buildSlots(-(TITLE_H + 10 + 3 * (CHIP_H + 8)))
-    frame.slotName = Text(frame, 12, "accent")
+    frame.slotName = Text(body, 12, "accent")
     frame.slotName:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -(TITLE_H + 10 + 3 * (CHIP_H + 8) + SLOT_SIZE + 6))
 
     -- Row 4: count and sort.
-    frame.count = Text(frame, 14, "title")
+    frame.count = Text(body, 14, "title")
     frame.count:SetPoint("TOPLEFT", frame.slotName, "BOTTOMLEFT", 0, -6)
-    frame.sort = CreateFrame("Button", nil, frame)
+    frame.sort = CreateFrame("Button", nil, body)
     frame.sort:SetSize(420, 18)
     frame.sort:SetPoint("LEFT", frame.count, "RIGHT", 14, 0)
     frame.sort.text = Text(frame.sort, 12, "accent")
@@ -717,7 +735,7 @@ local function build()
     frame.heads = {}
     for _, h in ipairs({ { "value", "COL_VALUE" }, { "verdict", "COL_VERDICT" }, { "points", "COL_POINTS", "POINTS" },
         { "ilvl", "COL_ILVL", "ILVL" } }) do
-        local b = CreateFrame("Button", nil, frame)
+        local b = CreateFrame("Button", nil, body)
         b:SetSize(80, 16)
         b:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -(PAD + SCROLL_W + COL[h[1]]), headY)
         b.text = Text(b, 11, "muted", false)
@@ -735,7 +753,7 @@ local function build()
 
     buildWorn()
     buildList()
-    frame.footer = Text(frame, 11, "muted")
+    frame.footer = Text(body, 11, "muted")
     frame.footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", PAD, 8)
     frame.footer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PAD, 8)
 
@@ -866,6 +884,11 @@ function Window.Update()
     for _, chip in ipairs(chips) do paintChip(chip) end
     frame.classChip.fill:SetVertexColor(0, 0, 0, 0)
     paintText(frame.classChip.text, nil, classColor(currentClass()))
+    frame.tabs.shop:Relabel()
+    if state.tab == "shop" then
+        ns.ShoppingUI.Refresh()
+        return
+    end
     filterRow()
     paintSlots()
     paintWorn()
@@ -932,7 +955,17 @@ function Window.Restyle()
     for _, chip in ipairs(chips) do chip:Relabel() end
     frame.search.hint:SetText(L.SEARCH)
     ns.Panel.Restyle()
+    ns.ShoppingUI.Restyle()
     Window.Relayout()
+end
+
+-- The loot or the shopping list in the window.
+function Window.ShowTab(tab)
+    state.tab = tab
+    frame.classMenu:Hide()
+    frame.body:SetShown(tab ~= "shop")
+    frame.shop:SetShown(tab == "shop")
+    Window.Update()
 end
 
 function Window.Open()
