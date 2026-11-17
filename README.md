@@ -2,7 +2,8 @@
 
 A gear finder for WoW: Forever. Pick a class, one of its roles and an equipment slot, and the list shows every
 dungeon and raid drop, world drop, dungeon quest reward (blue and better) and crafted item that suits them, sorted by
-points for the role (trinkets' Use effects counted at 75%), with where to get it. "Better than worn" compares each item with what you wear in that slot: **Upgrade**
+points for the role (trinkets' Use effects counted at 75%; the weights can be changed per class and role
+under Options → Advanced), with where to get it. "Better than worn" compares each item with what you wear in that slot: **Upgrade**
 (more for the role, no less of its main stat) or **Alternative** (about as good, or a judgement call such as less
 healing but more spirit). A search button on every slot of the character window opens the list for that slot.
 

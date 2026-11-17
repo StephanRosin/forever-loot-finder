@@ -422,6 +422,7 @@ local function newRow(parent)
             GameTooltip:AddLine(L.POINTS_TIP:format(L["ROLE_" .. e.pointsRole] or e.pointsRole,
                 (("%.1f"):format(e.points):gsub("%.0$", ""))), 1, 0.82, 0)
             GameTooltip:AddLine(table.concat(parts, " + "), 0.85, 0.85, 0.85, true)
+            if Rules.HasCustom(currentClass(), e.pointsRole) then GameTooltip:AddLine(L.POINTS_CUSTOM, 0.6, 0.6, 0.6) end
             if e.item.onUse then
                 GameTooltip:AddLine(L.USE_COUNTED:format(Rules.USE_SHARE * 100), 0.6, 0.6, 0.6, true)
             end
@@ -951,7 +952,8 @@ function Window.Frame() return frame end
 Settings.OnChange(function(key)
     if not frame then return end
     if key == nil or key == "theme" or key == "themeColors" then Window.Restyle()
-    elseif key == "roles" or key:find("^filter") or key == "sort" then Window.Relayout() end
+    elseif key == "roles" or key:find("^filter") or key == "sort" then Window.Relayout()
+    elseif key == "weights" and Window.IsShown() then Window.Update() end
 end)
 
 Items.OnLoaded(function() if Window.IsShown() then Window.Update() end end)

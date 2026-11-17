@@ -54,12 +54,19 @@ Install both, and keep AtlasLoot's Dungeons and Raids, Crafting and Collections 
 ## Recipes
 - The panel of a crafted item tells where its recipe comes from: from the trainer, a boss or world drop, a quest, or a vendor with name and zone (only vendors of your faction).
 - A recipe you have already learned shows a green check instead.
+- Vendors are listed for your faction only, at most two by name.
 - The sources come from Wowhead's Forever recipe lists; creature, vendor and quest names are in English, zones in your language.
 
 ## Reagent prices
 - The panel of a crafted item lists its reagents as a table with the auction house price of each, the cost per craft and the total.
 - Prices come from **Auctionator** when it is installed; without it, a **Scan** button under the auction house window reads all auctions at once (about 10 seconds, at most every 20 minutes).
 - A note asks for a scan when prices are missing, or when they are older than two days. Reagents link to their tooltip; shift-click searches them at the open auction house.
+
+## Point weights (advanced)
+- Under Options → General → **Advanced**, a **Weights** page lets you set how many points each stat is worth, per class and role: one slider per stat the role counts, with the default beside its name.
+- Changed weights are highlighted; the list, the verdicts and the sorting follow at once, and the points tooltip says when your own weights are in use.
+- **Defaults for this role** and **All weights to defaults** bring the standard weights back.
+- Which stats a role wants or excludes stays fixed (casters never see attack power items, for example).
 
 ## Where to find it
 The minimap button, `/flf`, or Blizzard's addon compartment.

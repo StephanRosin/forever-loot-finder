@@ -136,11 +136,30 @@ Rules.CLASS_PROFILES = {
     WARRIOR = { MELEE = { noMana = true }, TANK = { noMana = true } },
 }
 
-local profiles = {}
--- The role's profile for a class (the role's own when the class has no override).
-function Rules.Profile(class, role)
+local profiles, defaults = {}, {}
+
+-- The player's own weights (options, "Advanced"): ForeverLootFinderDB.weights["CLASS:ROLE"] = { stat = weight },
+-- only those that differ from the default.
+local function custom(class, role)
+    local db = ns.DB and ns.DB().weights
+    return db and db[tostring(class) .. ":" .. role] or nil
+end
+
+-- The role's profile for a class (the role's own when the class has no override), with the
+-- player's own weights; plain: without them (the defaults the options show).
+function Rules.Profile(class, role, plain)
     local key = tostring(class) .. role
-    if profiles[key] then return profiles[key] end
+    local own = not plain and custom(class, role)
+    if own then
+        if profiles[key] then return profiles[key] end
+        local d = Rules.Profile(class, role, true)
+        local p = setmetatable({ weights = {} }, { __index = d })
+        for k, v in pairs(d.weights) do p.weights[k] = v end
+        for k, v in pairs(own) do p.weights[k] = v end
+        profiles[key] = p
+        return p
+    end
+    if defaults[key] then return defaults[key] end
     local b = Rules.PROFILES[role]
     local o = Rules.CLASS_PROFILES[class] and Rules.CLASS_PROFILES[class][role] or {}
     local p = { weights = {}, want = {}, exclude = {}, main = b.main, schools = b.schools,
@@ -149,9 +168,40 @@ function Rules.Profile(class, role)
         for k, v in pairs(b[f]) do p[f][k] = v end
         for k, v in pairs(o[f] or {}) do p[f][k] = v or nil end
     end
-    profiles[key] = p
+    defaults[key] = p
     return p
 end
+
+-- Sets one of the player's weights (the default again: dropped); nil weight: all of class and role back.
+function Rules.SetWeight(class, role, stat, weight)
+    local db = ns.DB()
+    db.weights = db.weights or {}
+    local key = tostring(class) .. ":" .. role
+    if stat then
+        local t = db.weights[key] or {}
+        local default = Rules.Profile(class, role, true).weights[stat] or 0
+        if weight and math.abs(weight - default) < 1e-6 then weight = nil end
+        t[stat] = weight
+        db.weights[key] = next(t) and t or nil
+    else
+        db.weights[key] = nil
+    end
+    if not next(db.weights) then db.weights = nil end
+    profiles = {}
+end
+
+-- Whether the player weighs this class and role differently.
+function Rules.HasCustom(class, role) return custom(class, role) ~= nil end
+
+-- All of the player's weights back to the defaults.
+function Rules.ResetWeights()
+    ns.DB().weights = nil
+    profiles = {}
+end
+
+-- The weighable stats in the options' order.
+Rules.WEIGHT_KEYS = { "HEAL", "SPELLDMG", "MP5", "INT", "SPI", "STA", "STR", "AGI", "AP", "RAP", "FAP", "DPS",
+    "HIT", "SHIT", "RHIT", "CRIT", "SCRIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "ARMOR" }
 
 -- Armour (item class 4) subclasses and weapons (item class 2).
 Rules.ARMOR, Rules.WEAPON = 4, 2

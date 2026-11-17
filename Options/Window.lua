@@ -261,6 +261,9 @@ local function generalRows()
                 ns.Print(L.MSG_THEME_ALL:format(ns.Themes.ApplyToAll()))
             end },
         } },
+        { type = "header", label = "OPT_ADVANCED" },
+        check("advanced", "OPT_ADVANCED_SHOW"),
+        { type = "text", label = "OPT_ADVANCED_HINT", height = 40 },
         { type = "header", label = "OPT_MINIMAP" },
         check("minimapShow", "OPT_MINIMAP_SHOW"),
         { type = "header", label = "OPT_RESET" },
@@ -304,9 +307,78 @@ local function charRows()
     }
 end
 
+-- The point weights of a class and role (Advanced): one slider per stat the role weighs, its
+-- default beside the name; buttons back to the defaults.
+local picked = {}
+local function pickedClass() return picked.class or select(2, UnitClass("player")) end
+local function pickedRole()
+    local roles = ns.Rules.CLASS_ROLES[pickedClass()] or {}
+    for _, r in ipairs(roles) do if r == picked.role then return r end end
+    return pickedClass() == select(2, UnitClass("player")) and Settings.Role(pickedClass()) or roles[1]
+end
+local function weightsChanged()
+    Settings.Changed("weights")
+    Window.Refresh()
+end
+local function fmt(v) return (("%.2f"):format(v):gsub("%.?0+$", "")) end
+
+local function weightRows()
+    local Rules = ns.Rules
+    local rows = {
+        { type = "header", label = "OPT_WEIGHTS" },
+        { type = "text", label = "OPT_WEIGHTS_HINT", height = 52 },
+        { type = "select", label = "OPT_WEIGHTS_CLASS",
+            choices = function()
+                local list = {}
+                for _, c in ipairs(Rules.CLASSES) do
+                    list[#list + 1] = { label = (LOCALIZED_CLASS_NAMES_MALE or {})[c] or c, value = c }
+                end
+                return list
+            end,
+            get = pickedClass, set = function(v) picked.class, picked.role = v, nil; Window.Refresh() end },
+        { type = "select", label = "OPT_WEIGHTS_ROLE",
+            choices = function()
+                local list = {}
+                for _, r in ipairs(Rules.CLASS_ROLES[pickedClass()] or {}) do
+                    list[#list + 1] = { label = L[Rules.RoleLabelKey(pickedClass(), r)], value = r }
+                end
+                return list
+            end,
+            get = pickedRole, set = function(v) picked.role = v; Window.Refresh() end },
+    }
+    for _, stat in ipairs(Rules.WEIGHT_KEYS) do
+        local function default() return Rules.Profile(pickedClass(), pickedRole(), true).weights[stat] end
+        rows[#rows + 1] = {
+            label = function()
+                local text = L.OPT_WEIGHT_LABEL:format(L["STAT_" .. stat], fmt(default() or 0))
+                local own = Rules.Profile(pickedClass(), pickedRole()).weights[stat]
+                if own == default() then return text end
+                -- Changed: in the accent colour.
+                local c = Style.COLORS.accent
+                return ("|cff%02x%02x%02x%s|r"):format(c[1] * 255, c[2] * 255, c[3] * 255, text)
+            end,
+            min = 0, max = 5, step = 0.05,
+            get = function() return Rules.Profile(pickedClass(), pickedRole()).weights[stat] or 0 end,
+            set = function(v) Rules.SetWeight(pickedClass(), pickedRole(), stat, v); weightsChanged() end,
+            -- Only the stats the role weighs at all (a zero there counts: mp5 for damage casters).
+            visible = function() return default() ~= nil end,
+        }
+    end
+    rows[#rows + 1] = { type = "buttons", buttons = {
+        { label = "OPT_WEIGHTS_RESET", width = 220, onClick = function()
+            Rules.SetWeight(pickedClass(), pickedRole()); weightsChanged()
+        end },
+        { label = "OPT_WEIGHTS_RESET_ALL", width = 220, onClick = function()
+            Rules.ResetWeights(); weightsChanged()
+        end },
+    } }
+    return rows
+end
+
 Window.PAGES = {
     { id = "general", label = "PAGE_GENERAL", rows = generalRows },
     { id = "character", label = "PAGE_CHARACTER", rows = charRows },
+    { id = "weights", label = "PAGE_WEIGHTS", rows = weightRows, shown = function() return S("advanced") end },
 }
 
 -- --------------------------------------------------------------------------

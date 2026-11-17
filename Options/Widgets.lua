@@ -215,6 +215,8 @@ function Widgets.Slider(parent, opts)
     local zeroText = opts.zeroText
     local function display(v)
         if zeroText and v == 0 then return zeroText end
+        -- Fractions: 0.15, not 0.15000000000000002.
+        if step < 1 then return (("%.2f"):format(v):gsub("%.?0+$", "")) end
         return tostring(v)
     end
     local function parse(text)

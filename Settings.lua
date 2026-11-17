@@ -29,6 +29,7 @@ Settings.DEFAULTS = {
     filterBetter = false,       -- only better than (or alternatives to) what is worn
     filterAlternatives = true,  -- with "better": the unclear ones too
     sort = "POINTS",            -- Filter.SORTS
+    advanced = false,           -- options: the page with the point weights
 }
 
 Settings.RANGES = {
@@ -105,6 +106,7 @@ function Settings.Reset()
     local old = ns.DB()
     ForeverLootFinderDB = { language = old.language, theme = old.theme, themeColors = old.themeColors,
         themeAdopted = old.themeAdopted, prices = old.prices }
+    ns.Rules.ResetWeights()   -- also forgets the profiles built with them
     Settings.Changed(nil)
 end
 
