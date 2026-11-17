@@ -21,7 +21,13 @@ ns.Filter = Filter
 
 local Rules, Items = ns.Rules, ns.Items
 
-Filter.SORTS = { "ILVL", "QUALITY", "NAME" }
+-- POINTS: the role's points, best first (only with a slot picked: across slots a
+-- chest always outscores a ring, so the window sorts by item level then).
+Filter.SORTS = { "POINTS", "ILVL", "QUALITY", "NAME" }
+function Filter.SortFor(sort, slot)
+    if sort == "POINTS" and not slot then return "ILVL" end
+    return sort
+end
 local UPGRADE_SHARE, ALT_SHARE, UPGRADE_MIN = 1.05, 0.9, 0.5
 
 -- The points the worn item has for a role (fitting or not: a worn item is
@@ -53,9 +59,29 @@ end
 
 -- The worn item an item of `slot` is compared with for `role` (the weaker of
 -- two rings or trinkets, or the one invSlot), nil when the slot is empty.
-function Filter.Against(slot, invSlot, role, class)
-    local _, _, _, item = weakest(role, Filter.WornIn(slot, invSlot), class or select(2, UnitClass("player")))
-    return item
+-- A two-hander replaces both hands: the worn main and off hand count as one
+-- (their stats summed). Without an off hand the main hand stands alone.
+local function bothHands(mainList, offList)
+    local a, b = mainList[1], offList[1]
+    if not (a and b) then return mainList end
+    if not (a.loaded and b.loaded) then return { a } end
+    local stats = {}
+    for _, w in ipairs({ a, b }) do
+        for k, v in pairs(w.stats or {}) do stats[k] = (stats[k] or 0) + v end
+    end
+    return { { id = a.id, loaded = true, quality = a.quality, name = (a.name or "?") .. " + " .. (b.name or "?"), stats = stats } }
+end
+Filter.BothHands = bothHands
+
+local function twoHanded(item, slot)
+    return slot and slot.key == "MAINHAND" and item and item.equipLoc == "INVTYPE_2HWEAPON"
+end
+
+function Filter.Against(slot, invSlot, role, class, item)
+    local list = Filter.WornIn(slot, invSlot)
+    if twoHanded(item, slot) then list = bothHands(list, Filter.WornIn(Rules.SLOT.OFFHAND)) end
+    local _, _, _, worn = weakest(role, list, class or select(2, UnitClass("player")))
+    return worn
 end
 
 -- Stat by stat what item gives over worn: { { key, delta } } in a fixed order.
@@ -66,7 +92,7 @@ function Filter.Diff(item, worn)
     local a, b, list = item.stats or {}, worn and worn.stats or {}, {}
     for _, k in ipairs(ORDER) do
         local d = (a[k] or 0) - (b[k] or 0)
-        if d ~= 0 then list[#list + 1] = { key = k, delta = d } end
+        if math.abs(d) >= 0.5 then list[#list + 1] = { key = k, delta = d } end
     end
     return list
 end
@@ -109,6 +135,9 @@ local function evaluate(item, o, slot)
             end
         end
         if #entry.roles == 0 then return nil end
+        for _, r in ipairs(entry.roles) do
+            if not entry.points or r.points > entry.points then entry.points, entry.pointsRole = r.points, r.role end
+        end
     end
     if not o.better then return entry end
     -- What is worn is no alternative to itself, in either ring or trinket slot.
@@ -119,10 +148,14 @@ local function evaluate(item, o, slot)
         entry.verdict = "ALT"
     else
         local wornList = o.worn(slot)
+        if twoHanded(item, slot) then wornList = bothHands(wornList, o.worn(Rules.SLOT.OFFHAND)) end
+        -- A one-hander or off hand beside a worn two-hander: half a pair, at best an alternative.
+        local halfPair = (slot.key == "MAINHAND" or slot.key == "OFFHAND") and item.equipLoc ~= "INVTYPE_2HWEAPON"
+            and (o.worn(Rules.SLOT.MAINHAND)[1] or {}).equipLoc == "INVTYPE_2HWEAPON"
         for _, r in ipairs(entry.roles) do
             local wp, wm, wornUnclear = weakest(r.role, wornList, o.class)
             r.verdict = Filter.Verdict(r.points, r.main, wp, wm)
-            if wornUnclear and r.verdict then r.verdict = "ALT" end
+            if (wornUnclear or halfPair) and r.verdict then r.verdict = "ALT" end
             r.delta = r.points - wp
             if r.verdict and (not entry.verdict or RANK[r.verdict] > RANK[entry.verdict]) then
                 entry.verdict, entry.delta = r.verdict, r.delta
@@ -140,7 +173,11 @@ local function compare(sort)
         local la, lb = ia.ilvl or -1, ib.ilvl or -1
         local qa, qb = ia.quality or -1, ib.quality or -1
         local na, nb = ia.name or "", ib.name or ""
-        if sort == "NAME" then
+        local pa, pb = a.points or -1, b.points or -1
+        if sort == "POINTS" then
+            if pa ~= pb then return pa > pb end
+            if la ~= lb then return la > lb end
+        elseif sort == "NAME" then
             if na ~= nb then return na < nb end
         elseif sort == "QUALITY" then
             if qa ~= qb then return qa > qb end
@@ -175,6 +212,8 @@ function Filter.Run(o)
                 local wanted
                 if global then
                     wanted = true
+                elseif d.world then
+                    wanted = o.world
                 elseif d.craft then
                     wanted = o.crafting
                 elseif d.quest then
@@ -194,7 +233,8 @@ function Filter.Run(o)
                 and not (o.bestArmor and not Rules.IsBestArmor(o.class, item.classID, item.subClassID,
                     item.equipLoc, wearLevel))
             if keep then Items.Full(item) end
-            keep = keep and not (not global and o.now and item.loaded and item.reqLevel > o.level)
+            keep = keep and not (not global and item.loaded and not Items.ForClass(item, o.class))
+                and not (not global and o.now and item.loaded and item.reqLevel > o.level)
                 and not (text and not (item.name and item.name:lower():find(text, 1, true)))
             if keep then Items.Request(item) end
             -- Loaded, but neither stats nor an effect: the client does not know
@@ -202,7 +242,7 @@ function Filter.Run(o)
             if keep and item.loaded and not Rules.HasStats(item.stats) and not item.otherStats
                 and #(item.effects or {}) == 0 then
                 keep, unknown = false, unknown + 1
-                item.loaded = nil -- read again next time: the stats may come later
+                item.loaded, item.classesRead = nil, nil -- read again next time: the stats may come later
             end
             local entry = keep and (evaluate(item, plain, slot) or global and { item = item, roles = {}, slot = slot })
             if entry then
@@ -211,7 +251,7 @@ function Filter.Run(o)
             end
         end
     end
-    table.sort(list, compare(o.sort))
+    table.sort(list, compare(Filter.SortFor(o.sort, o.slot)))
     return list, unknown
 end
 
@@ -234,7 +274,7 @@ function Filter.Options(over)
     local o = {
         class = class, level = UnitLevel("player") or 60, roles = ns.Settings.Roles(class),
         now = S("filterNow"), bestArmor = S("filterBestArmor"), dungeons = S("filterDungeons"),
-        raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"), tankHit = S("filterTankHit"),
+        raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), world = S("filterWorld"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"), tankHit = S("filterTankHit"),
         sort = S("sort"), text = "",
     }
     for k, v in pairs(over or {}) do o[k] = v end

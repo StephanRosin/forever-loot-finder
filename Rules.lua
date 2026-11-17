@@ -81,7 +81,8 @@ Rules.PROFILES = {
         want = set({ "HEAL", "MP5", "INT", "SPI" }), exclude = set(PHYSICAL), main = "HEAL",
     },
     CASTER = {
-        weights = { SPELLDMG = 1, HIT = 1.2, SHIT = 1.2, CRIT = 0.7, SCRIT = 0.7, INT = 0.4, STA = 0.2, SPI = 0.1, MP5 = 0.5 },
+        -- Damage casters do not run dry in a fight worth gearing for: no points for mana regeneration.
+        weights = { SPELLDMG = 1, HIT = 1.2, SHIT = 1.2, CRIT = 0.7, SCRIT = 0.7, INT = 0.4, STA = 0.2, SPI = 0.1, MP5 = 0 },
         want = set({ "SPELLDMG", "HIT", "SHIT", "CRIT", "SCRIT", "INT" }), exclude = set(PHYSICAL), main = "SPELLDMG",
         healingItemsOut = true, schools = true,
     },
@@ -107,9 +108,15 @@ Rules.PROFILES = {
 -- Per class: weights replace the role's, want/exclude entries switch on
 -- (true) or off (false). Bears cannot parry or block and live on armour;
 -- paladin and shaman damage and tank sets carry spell power.
+-- Healing spirit in Forever: Meditation (priest) and Reflection (druid) keep 50% of the
+-- regeneration while casting; a point of spirit then gives about 0.31 (priest, spirit/4
+-- per tick) or 0.25 x 1.15 Living Spirit (druid, spirit/5) mana per 5 sec, at MP5's 2.5;
+-- the priest's Spiritual Guidance adds 25% of spirit as healing.
 local HYBRID = { SPELLDMG = false, HEAL = false, MP5 = false }
 Rules.CLASS_PROFILES = {
+    PRIEST = { HEAL = { weights = { SPI = 1.0 } } },
     DRUID = {
+        HEAL = { weights = { SPI = 0.7 } },
         TANK = { weights = { ARMOR = 0.25, AGI = 0.8, DEF = 0.6, PARRY = 0, BLOCK = 0, BLOCKVAL = 0, DPS = 0, FAP = 0.15 },
             want = { AGI = true, PARRY = false, BLOCK = false, BLOCKVAL = false } },
         MELEE = { weights = { STR = 1.2, FAP = 0.5, DPS = 0 }, want = { FAP = true, DPS = false } },
@@ -122,7 +129,7 @@ Rules.CLASS_PROFILES = {
     SHAMAN = {
         MELEE = { weights = { SPELLDMG = 0.3, INT = 0.2, MP5 = 0.5 }, exclude = HYBRID, healingItemsOut = true },
         HEAL = { weights = { SPI = 0.1 }, want = { SPI = false } },
-        CASTER = { weights = { SPI = 0, MP5 = 0.8 } },
+        CASTER = { weights = { SPI = 0 } },
     },
     WARLOCK = { CASTER = { weights = { STA = 0.4, SPI = 0 } } },
     ROGUE = { MELEE = { weights = { STR = 0.5 }, noMana = true } },
@@ -323,6 +330,20 @@ function Rules.Points(role, stats, class)
     return points, main
 end
 
+-- What the points are made of: { { key, points } }, biggest first (the tooltip's sum).
+function Rules.PointParts(role, stats, class)
+    local p = Rules.Profile(class, role)
+    local parts = {}
+    local school = schoolDamage(p, class, stats)
+    if school > 0 and (p.weights.SPELLDMG or 0) > 0 then parts[#parts + 1] = { "SPELLDMG", school * p.weights.SPELLDMG } end
+    for k, v in pairs(stats) do
+        local w = p.weights[k] or 0
+        if w ~= 0 and v ~= 0 then parts[#parts + 1] = { k, v * w } end
+    end
+    table.sort(parts, function(a, b) return a[2] > b[2] end)
+    return parts
+end
+
 -- How an item serves a role of a class: fits (a wanted stat, no excluded
 -- one), its points and its main stat. A healing item (more healing than
 -- damage) is out for casters; a school's damage is out for all but its casters.
@@ -330,14 +351,14 @@ function Rules.ForRole(role, stats, class)
     local p = Rules.Profile(class, role)
     local own = p.schools and Rules.CLASS_SCHOOLS[class] or {}
     local fits, school = false, schoolDamage(p, class, stats)
-    for k in pairs(stats) do
+    for k, v in pairs(stats) do
         local s = Rules.SCHOOL_OF[k]
         if s then
             if not own[s] then return false, 0, 0 end
             fits = true
         else
             if p.exclude[k] then return false, 0, 0 end
-            if p.want[k] then fits = true end
+            if p.want[k] and v > 0 then fits = true end   -- a stat taken away (Mindtap's intellect) is no reason
         end
     end
     if p.healingItemsOut and (stats.HEAL or 0) > (stats.SPELLDMG or 0) + school then return false, 0, 0 end
@@ -383,6 +404,67 @@ Rules.CLASS_SCHOOLS = {
 
 -- A chance on hit comes from weapon blows.
 Rules.PROC_ROLES = { TANK = true, MELEE = true, RANGED = true }
+
+-- Trinkets' "Use:" effects as stats, read by hand from Wowhead's Forever tooltips:
+-- [id] = { seconds it lasts, cooldown in seconds, stats while it lasts }. Mana
+-- given at once is MANA (spread over the cooldown as mp5). A bonus that wears
+-- off with each cast or hit counts with its average. Effects no stat can stand
+-- for (stuns, pets, teleports, absorbs, direct heals) are left out.
+Rules.ON_USE = {
+    [18820] = { 15, 90, { HEAL = 175, SPELLDMG = 175 } },          -- Talisman of Ephemeral Power
+    [20636] = { 15, 90, { HEAL = 350 } },                          -- Hibernation Crystal
+    [23046] = { 20, 120, { HEAL = 130, SPELLDMG = 130 } },         -- The Restrained Essence of Sapphiron
+    [21473] = { 30, 180, { SPELLDMG = 50 } },                      -- Eye of Moam
+    [274615] = { 30, 360, { HEAL = 19, SPELLDMG = 19 } },          -- Heart of the Primeval
+    [249469] = { 15, 300, { FROSTDMG = 29, SHADOWDMG = 29 } },     -- Frozen Heart of the Mountain
+    [19950] = { 20, 120, { HEAL = 204, SPELLDMG = 102 } },         -- Zandalarian Hero Charm (falls per cast)
+    [23047] = { 30, 120, { HEAL = 190 } },                         -- Eye of the Dead (450 on 5 of ~12 heals)
+    [22678] = { 10, 60, { HEAL = 150, SPELLDMG = 80 } },           -- Talisman of Ascendance (stacks up)
+    [11819] = { 0, 900, { MANA = 630 } },                          -- Second Wind
+    [18371] = { 120, 420, { MANA = 1250, INT = -60 } },            -- Mindtap Talisman (-60 int for 2 min)
+    [20512] = { 0, 300, { MANA = 340 } },                          -- Sanctified Orb
+    [23027] = { 0, 180, { MANA = 500 } },                          -- Warmth of Forgiveness
+    [20503] = { 0, 600, { MANA = 396 } },                          -- Enamored Water Spirit
+    [11832] = { 0, 360, { MANA = 600 } },                          -- Burst of Knowledge (-150 on ~4 casts)
+    [272439] = { 15, 360, { SPI = 72 } },                          -- Serenity Field
+    [270226] = { 15, 300, { STR = 16, AGI = 16, STA = 16, INT = 16, SPI = 16 } }, -- Golden Banana
+    [280071] = { 30, 300, { AGI = 33 } },                          -- Flamebreak Talisman
+    [249470] = { 15, 300, { AP = 55, RAP = 55 } },                 -- Molten Heart of the Mountain
+    [21180] = { 20, 120, { AP = 280, RAP = 280 } },                -- Earthstrike
+    [23041] = { 20, 120, { AP = 260, RAP = 260 } },                -- Slayer's Crest
+    [23570] = { 20, 120, { AP = 357, RAP = 357 } },                -- Jom Gabbar (65 more every 2 sec)
+    [13965] = { 20, 300, { CRIT = 5 } },                           -- Blackhand's Breadth
+    [272438] = { 8, 360, { CRIT = 5, SCRIT = 5 } },                -- Weakness Analyzer (until a crit)
+    [13968] = { 20, 300, { SHIT = 7 } },                           -- Eye of the Beast
+    [19952] = { 15, 180, { SCRIT = 10 } },                         -- Gri'lek's Charm of Valor
+    [13966] = { 15, 300, { STA = 62 } },                           -- Mark of Tyranny (620 health)
+    [15873] = { 126, 600, { STA = 40, STR = -10, AGI = -10 } },    -- Ragged John's Neverending Cup
+    [11811] = { 20, 360, { ARMOR = 520 } },                        -- Smoking Heart of the Mountain
+    [19345] = { 20, 300, { ARMOR = 500 } },                        -- Aegis of Preservation
+    [19948] = { 20, 120, { ARMOR = 1000, DEF = 15 } },             -- Zandalarian Hero Badge (falls per hit)
+    [23040] = { 20, 120, { BLOCKVAL = 235 } },                     -- Glyph of Deflection
+    [18370] = { 6, 360, { DODGE = 20 } },                          -- Vigilance Charm (until 3 dodges)
+    [274386] = { 20, 300, { DODGE = 3 } },                         -- Toy Soldier
+    [280060] = { 15, 300, { DODGE = 5 } },                         -- Lucky Shovelnose Tuft
+    [272440] = { 15, 360, { BLOCK = 8 } },                         -- Defender's Grip Stabilizer
+}
+-- Not used every time it is ready: the share counted.
+Rules.USE_SHARE = 0.75
+
+-- Adds an item's "Use:" effect to its stats (averaged over the cooldown); true when it had one.
+function Rules.AddUse(id, stats)
+    local use = Rules.ON_USE[id]
+    if not (use and stats) then return false end
+    local dur, cd, bonus = use[1], use[2], use[3]
+    for k, v in pairs(bonus) do
+        if k == "MANA" then
+            stats.MP5 = (stats.MP5 or 0) + v / cd * 5 * Rules.USE_SHARE
+        else
+            stats[k] = (stats[k] or 0) + v * dur / cd * Rules.USE_SHARE
+        end
+    end
+    return true
+end
 
 -- The roles an item's effects serve ({ HEAL = true, ... }), or nil when no
 -- word matched: a plain effect ("deals 300 nature damage") may serve anyone.

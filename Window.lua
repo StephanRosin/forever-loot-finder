@@ -23,6 +23,10 @@ local Lib = LibForeverThemes
 local WIDTH, HEIGHT, TITLE_H, PAD = 780, 640, 32, 12
 local CHIP_H, CHIP_GAP, SLOT_SIZE = 22, 6, 32
 local ROW_H, ROW_GAP, DETAIL_LINE, ICON = 44, 4, 16, 34
+-- Right edges of the row's columns (item level, points, verdict, main value), from the row's
+-- right; the headers above use the same. Rows end SCROLL_W short of the list (the scroll thumb).
+local COL = { ilvl = 12, points = 62, verdict = 118, value = 210 }
+local SCROLL_W = 4
 local FOOTER_H = 26
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local SEARCH_ICON = "Interface\\Common\\UI-Searchbox-Icon"
@@ -301,7 +305,7 @@ end
 -- ---------------------------------------------------------------------------
 local function statText(entry)
     if entry.unclear then
-        if not entry.item.loaded then return L.LOADING end
+        if not entry.item.loaded then return Items.NoData(entry.item) and L.NO_DATA or L.LOADING end
         local e = entry.item.effects and entry.item.effects[1]
         return e and L["EFFECT_" .. e.kind] or L.NO_STATS
     end
@@ -323,6 +327,7 @@ end
 local function dropText(d)
     if d.quest then return ("%s · %s"):format(L.QUEST_NAME:format(d.quest), d.instance) end
     if d.craft then return L.CRAFT_NAME:format(d.instance, d.skill or 0) end
+    if d.world then return L.WORLD_DROP end
     local where = ("%s · %s"):format(d.boss, d.instance)
     if d.rate then where = where .. (" · %s %%"):format(d.rate) end
     return where
@@ -346,18 +351,21 @@ local function newRow(parent)
     row.iconEdges = edges(row.frame)
     row.name = Text(row, 13, "text", false)
     row.name:SetPoint("TOPLEFT", row, "TOPLEFT", ICON + 18, -7)
-    row.name:SetPoint("TOPRIGHT", row, "TOPRIGHT", -260, -7)
+    row.name:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(COL.value + 100), -7)
     row.where = Text(row, 11, "muted")
     row.where:SetPoint("TOPLEFT", row, "TOPLEFT", ICON + 18, -25)
-    row.where:SetPoint("TOPRIGHT", row, "TOPRIGHT", -260, -25)
+    row.where:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(COL.value + 100), -25)
     row.ilvl = Text(row, 18, "title")
-    row.ilvl:SetPoint("RIGHT", row, "TOPRIGHT", -12, -ROW_H / 2)
+    row.ilvl:SetPoint("RIGHT", row, "TOPRIGHT", -COL.ilvl, -ROW_H / 2)
     row.ilvl:SetJustifyH("RIGHT")
+    row.points = Text(row, 15, "text", false)
+    row.points:SetPoint("RIGHT", row, "TOPRIGHT", -COL.points, -ROW_H / 2)
+    row.points:SetJustifyH("RIGHT")
     row.verdict = Text(row, 11, "text", false)
-    row.verdict:SetPoint("RIGHT", row, "TOPRIGHT", -52, -ROW_H / 2)
+    row.verdict:SetPoint("RIGHT", row, "TOPRIGHT", -COL.verdict, -ROW_H / 2)
     row.verdict:SetJustifyH("RIGHT")
     row.value = Text(row, 12, "text", false)
-    row.value:SetPoint("RIGHT", row.verdict, "LEFT", -10, 0)
+    row.value:SetPoint("RIGHT", row, "TOPRIGHT", -COL.value, -ROW_H / 2)
     row.value:SetJustifyH("RIGHT")
     -- Marks (bonus armor, hit) right under the value, which moves up for them.
     row.badges = Text(row, 11, "text", false)
@@ -389,7 +397,7 @@ local function newRow(parent)
         GameTooltip:SetHyperlink(e.item.link or ("item:" .. e.item.id))
         -- What it gives or takes against the worn one, stat by stat.
         if e.slot and e.item.loaded then
-            local worn = Filter.Against(e.slot, state.slot and state.invSlot or nil, next(roles()), currentClass())
+            local worn = Filter.Against(e.slot, state.slot and state.invSlot or nil, next(roles()), currentClass(), e.item)
             GameTooltip:AddLine(" ")
             if not worn then
                 GameTooltip:AddLine(L.COMPARE_EMPTY, 1, 0.82, 0)
@@ -402,6 +410,20 @@ local function newRow(parent)
                         up and 0.4 or 0.3)
                 end
                 if #diff == 0 then GameTooltip:AddLine(L.COMPARE_SAME, 0.7, 0.7, 0.7) end
+            end
+        end
+        -- Where the points come from.
+        if e.points and e.item.stats then
+            local parts = {}
+            for _, p in ipairs(Rules.PointParts(e.pointsRole, e.item.stats, currentClass())) do
+                parts[#parts + 1] = ("%s %s"):format(L["STAT_" .. p[1]] or p[1], (("%.1f"):format(p[2]):gsub("%.0$", "")))
+            end
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(L.POINTS_TIP:format(L["ROLE_" .. e.pointsRole] or e.pointsRole,
+                (("%.1f"):format(e.points):gsub("%.0$", ""))), 1, 0.82, 0)
+            GameTooltip:AddLine(table.concat(parts, " + "), 0.85, 0.85, 0.85, true)
+            if e.item.onUse then
+                GameTooltip:AddLine(L.USE_COUNTED:format(Rules.USE_SHARE * 100), 0.6, 0.6, 0.6, true)
             end
         end
         GameTooltip:Show()
@@ -431,13 +453,18 @@ local function details(entry)
     return lines
 end
 
+-- Another class is compared with nothing: the worn gear is the player's.
+local function wornShown()
+    return ownClass() and S("filterBetter") and state.slot ~= nil
+end
+
 local function fillRow(row, entry, open)
     row.entry = entry
     local item = entry.item
     local q = QUALITY[item.quality or 1] or QUALITY[1]
     row.icon:SetTexture(item.icon)
     paintEdges(row.iconEdges, q, 1)
-    row.name:SetText(item.name or L.LOADING)
+    row.name:SetText(item.name or (Items.NoData(item) and L.ITEM_ID:format(item.id)) or L.LOADING)
     paintText(row.name, nil, item.loaded and q or colour("muted"))
     local d = entry.drops[1]
     local more = #entry.drops > 1 and ("  (+%d)"):format(#entry.drops - 1) or ""
@@ -448,7 +475,7 @@ local function fillRow(row, entry, open)
     if bonus then marks[#marks + 1] = L.BONUS_ARMOR:format(item.bonusArmor) end
     if entry.hit then marks[#marks + 1] = L.HIT_MARK:format(entry.hit) end
     row.badges:SetText(table.concat(marks, " · "))
-    row.value:SetPoint("RIGHT", row.verdict, "LEFT", -10, #marks > 0 and 7 or 0)
+    row.value:SetPoint("RIGHT", row, "TOPRIGHT", -COL.value, -ROW_H / 2 + (#marks > 0 and 7 or 0))
     paintText(row.badges, nil, UP_COLOR)
     row.value:SetText(statText(entry))
     paintText(row.value, entry.unclear and "muted" or "text")
@@ -460,6 +487,15 @@ local function fillRow(row, entry, open)
         row.verdict:SetText("")
     end
     row.ilvl:SetText(item.ilvl and tostring(item.ilvl) or "–")
+    -- Against the worn one its difference, else the points themselves.
+    if entry.points and wornShown() and entry.delta then
+        local d = math.floor(entry.delta + 0.5)
+        row.points:SetText(("%+d"):format(d))
+        paintText(row.points, nil, d > 0 and UP_COLOR or colour("muted"))
+    else
+        row.points:SetText(entry.points and tostring(math.floor(entry.points + 0.5)) or "")
+        paintText(row.points, "text")
+    end
     local card = ns.ThemeArt.CardColour()
     row.back:SetVertexColor(card[1], card[2], card[3], card[4])
     local a = colour("accent")
@@ -543,8 +579,11 @@ local function buildWorn()
     w.name = Text(w, 13, "text", false)
     w.name:SetPoint("TOPLEFT", w, "TOPLEFT", ICON + 18, -22)
     w.ilvl = Text(w, 18, "title")
-    w.ilvl:SetPoint("RIGHT", w, "RIGHT", -12, 0)
-    paintText(w.ilvl, "muted")
+    w.ilvl:SetPoint("RIGHT", w, "TOPRIGHT", -COL.ilvl, -ROW_H / 2)
+    w.ilvl:SetJustifyH("RIGHT")
+    w.points = Text(w, 15, "text")
+    w.points:SetPoint("RIGHT", w, "TOPRIGHT", -COL.points, -ROW_H / 2)
+    w.points:SetJustifyH("RIGHT")
     w:EnableMouse(true)
     w:SetScript("OnEnter", function(self)
         if not self.link then return end
@@ -637,7 +676,7 @@ local function build()
         return out
     end
     frame.sourceChips = chipsOf({ { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
-        { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" } })
+        { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" }, { "filterWorld", "FILTER_WORLD" } })
     frame.filterChips = chipsOf({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
         { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" },
         { "filterTankHit", "FILTER_TANK_HIT" } })
@@ -654,17 +693,36 @@ local function build()
     frame.count = Text(frame, 14, "title")
     frame.count:SetPoint("TOPLEFT", frame.slotName, "BOTTOMLEFT", 0, -6)
     frame.sort = CreateFrame("Button", nil, frame)
-    frame.sort:SetSize(140, 18)
-    frame.sort:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_H + 10 + 3 * (CHIP_H + 8) + SLOT_SIZE + 26))
+    frame.sort:SetSize(420, 18)
+    frame.sort:SetPoint("LEFT", frame.count, "RIGHT", 14, 0)
     frame.sort.text = Text(frame.sort, 12, "accent")
-    frame.sort.text:SetPoint("RIGHT")
-    frame.sort.text:SetJustifyH("RIGHT")
+    frame.sort.text:SetPoint("LEFT")
     frame.sort:SetScript("OnClick", function()
         local i = 1
         for k, v in ipairs(Filter.SORTS) do if v == S("sort") then i = k end end
         Settings.Set("sort", Filter.SORTS[i % #Filter.SORTS + 1])
         Window.Update()
     end)
+    -- Column headers right over the columns; points and item level sort (best first) on a click.
+    local headY = -(TITLE_H + 10 + 3 * (CHIP_H + 8) + SLOT_SIZE + 32)
+    frame.heads = {}
+    for _, h in ipairs({ { "value", "COL_VALUE" }, { "verdict", "COL_VERDICT" }, { "points", "COL_POINTS", "POINTS" },
+        { "ilvl", "COL_ILVL", "ILVL" } }) do
+        local b = CreateFrame("Button", nil, frame)
+        b:SetSize(80, 16)
+        b:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -(PAD + SCROLL_W + COL[h[1]]), headY)
+        b.text = Text(b, 11, "muted", false)
+        b.text:SetPoint("RIGHT")
+        b.text:SetJustifyH("RIGHT")
+        b.key, b.label, b.sort = h[1], h[2], h[3]
+        if b.sort then
+            b:SetScript("OnClick", function(self)
+                Settings.Set("sort", self.sort)
+                Window.Update()
+            end)
+        end
+        frame.heads[h[1]] = b
+    end
 
     buildWorn()
     buildList()
@@ -703,10 +761,20 @@ function Window.Relayout()
     Window.Update()
 end
 
--- Another class is compared with nothing: the worn gear is the player's.
-local function wornShown()
-    return ownClass() and S("filterBetter") and state.slot ~= nil
+-- The options as a string: what the list shows (not the functions it calls).
+local function signature(o)
+    local parts = {}
+    for k, v in pairs(o) do
+        if type(v) == "table" then
+            for r, on in pairs(v) do parts[#parts + 1] = k .. "." .. tostring(r) .. "=" .. tostring(on) end
+        elseif type(v) ~= "function" then
+            parts[#parts + 1] = k .. "=" .. tostring(v)
+        end
+    end
+    table.sort(parts)
+    return table.concat(parts, ";")
 end
+
 
 local function paintWorn()
     local w = frame.worn
@@ -715,7 +783,7 @@ local function paintWorn()
     if not wornShown() then return end
     w:ClearAllPoints()
     w:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -TOP_LIST)
-    w:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -TOP_LIST)
+    w:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD - SCROLL_W, -TOP_LIST)
     local list = Filter.WornIn(slot, state.invSlot)
     local item = list[1]
     w.label:SetText(L.WORN)
@@ -723,8 +791,18 @@ local function paintWorn()
     w.icon:SetTexture(item and item.icon or Rules.SlotArt(slot))
     w.name:SetText(item and (item.name or "…") or L.EMPTY_SLOT)
     if #list > 1 and list[2].name then w.name:SetText((item.name or "…") .. "  ·  " .. list[2].name) end
-    paintText(w.name, "muted")
+    local q = item and item.quality and QUALITY[item.quality]
+    paintText(w.name, q and nil or "muted", q)
     w.ilvl:SetText(item and item.ilvl and tostring(item.ilvl) or "")
+    -- Its points for the best of the picked roles: what the list's differences start from.
+    local best
+    if item and item.stats then
+        for role in pairs(roles()) do
+            local fits, pts = Rules.ForRole(role, item.stats, currentClass())
+            if fits and (not best or pts > best) then best = pts end
+        end
+    end
+    w.points:SetText(best and tostring(math.floor(best + 0.5)) or "")
     w.back:SetVertexColor(0, 0, 0, 0.25)
     paintEdges(w.edges, colour("muted"), 0.35)
 end
@@ -748,7 +826,7 @@ function Window.Draw()
         local h = fillRow(row, e, state.open == e.item.id)
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
-        row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -4, -y)
+        row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -SCROLL_W, -y)
         row:SetHeight(h)
         row:Show()
         y = y + h + ROW_GAP
@@ -796,6 +874,9 @@ function Window.Update()
         local o = Filter.Options({ class = currentClass(), roles = roles(), slot = state.slot,
             invSlot = state.invSlot, text = state.text, better = ownClass() and S("filterBetter") })
         entries, unknown = Filter.Run(o)
+        -- Other filters, another list: back to its top (items arriving keep the place).
+        local sig = signature(o)
+        if sig ~= state.sig then state.sig, state.offset = sig, 0 end
         frame.list.empty:SetText(#entries == 0 and L.NOTHING or "")
     else
         entries, unknown = {}, 0
@@ -803,7 +884,15 @@ function Window.Update()
     end
     state.offset = math.max(0, math.min(state.offset, #entries - 1))
     frame.count:SetText(L.HITS:format(#entries))
-    frame.sort.text:SetText(L["SORT_" .. S("sort")])
+    local sort = Filter.SortFor(S("sort"), state.slot)
+    frame.sort.text:SetText(L.SORT_BY:format(L["SORT_" .. sort])
+        .. (sort ~= S("sort") and ("  " .. L.SORT_POINTS_SLOT) or ""))
+    for _, b in pairs(frame.heads) do
+        local label = L[b.label]
+        if b.key == "points" and wornShown() then label = L.COL_DELTA end
+        b.text:SetText(label)
+        if b.sort == sort then paintText(b.text, "accent") else paintText(b.text, "muted") end
+    end
     local foot = ns.Source.Name() and L.SOURCE:format(ns.Source.Name()) or ""
     if unknown > 0 then foot = foot .. "   ·   " .. L.UNKNOWN_ITEMS:format(unknown) end
     frame.footer:SetText(foot)

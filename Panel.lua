@@ -107,6 +107,24 @@ local function build(parent)
     panel.whoDetail:SetPoint("TOPRIGHT", panel.who, "BOTTOMRIGHT", 0, -3)
     panel.whoDetail:SetWordWrap(true)
 
+    -- A craft's reagents: a table (count and name, price each, line total), the sum, hints.
+    local mats = CreateFrame("Frame", nil, panel)
+    mats:SetPoint("TOPLEFT", panel.who, "BOTTOMLEFT", 0, -8)
+    mats:SetPoint("TOPRIGHT", panel.who, "BOTTOMRIGHT", 0, -8)
+    mats.rows = {}
+    mats.headName, mats.headEach, mats.headSum = UI.Text(mats, 11, "muted"), UI.Text(mats, 11, "muted"), UI.Text(mats, 11, "muted")
+    mats.rule = UI.fill(mats, "ARTWORK")
+    mats.rule:SetHeight(1)
+    mats.totalLabel, mats.total = UI.Text(mats, 15, "title"), UI.Text(mats, 15, "title")
+    mats.age = UI.Text(mats, 12, "muted")
+    mats.hints = {}
+    for i = 1, 2 do
+        mats.hints[i] = UI.Text(mats, 13, "accent")
+        mats.hints[i]:SetWordWrap(true)
+    end
+    mats:Hide()
+    panel.mats = mats
+
     panel.model = CreateFrame("PlayerModel", nil, panel)
     panel.model:SetPoint("TOPLEFT", panel.whoDetail, "BOTTOMLEFT", 0, -6)
     panel.model:SetPoint("TOPRIGHT", panel.whoDetail, "BOTTOMRIGHT", 0, -6)
@@ -186,13 +204,13 @@ function Panel.Show(parent, entry, onClose)
         return
     end
     if not panel then build(parent) end
-    panel.onClose = onClose
+    panel.onClose, panel.entry, panel.parent = onClose, entry, parent
     local drop, place = pick(entry)
-    panel.title:SetText(place and place.name or drop.instance)
-    panel.location:SetText(place and place.location or (drop.raid and L.RAID or L.DUNGEON))
+    panel.title:SetText(place and place.name or drop.world and L.WORLD_DROP or drop.instance)
+    panel.location:SetText(place and place.location or drop.world and L.WORLD_WHERE or (drop.raid and L.RAID or L.DUNGEON))
     showMap(place)
     local model = panel.model
-    panel.map:SetShown(not drop.craft)
+    panel.map:SetShown(not drop.craft and not drop.world)
     panel.who:ClearAllPoints()
     local artName = drop.craft and Panel.ArtFor(drop.prof)
     local art = panel.art
@@ -201,21 +219,22 @@ function Panel.Show(parent, entry, onClose)
     end
     art.name, art.frame, art.t = artName, nil, 0
     art:SetShown(artName ~= nil)
-    local above = artName and art or drop.craft and panel.location or panel.entrance
+    local above = artName and art or (drop.craft or drop.world) and panel.location or panel.entrance
     panel.who:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -12)
     panel.who:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -12)
+    panel.mats:SetShown(drop.craft == true)
     if drop.craft then
         panel.title:SetText(drop.instance)
         panel.location:SetText(L.CRAFT_SKILL:format(drop.skill or 0))
         panel.entrance:SetText("")
         panel.who:SetText(L.REAGENTS)
-        local parts = {}
-        for i, id in ipairs(drop.reagents or {}) do
-            local name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(id)
-            if not name and C_Item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
-            parts[#parts + 1] = ("%d× %s"):format((drop.counts or {})[i] or 1, name or ("#" .. id))
-        end
-        panel.whoDetail:SetText(table.concat(parts, ", "))
+        panel.whoDetail:SetText("")
+        Panel.ShowMats(drop)
+        model:Hide()
+    elseif drop.world then
+        panel.entrance:SetText("")
+        panel.who:SetText("")
+        panel.whoDetail:SetText("")
         model:Hide()
     elseif drop.quest then
         panel.who:SetText(L.QUEST_NAME:format(drop.quest))
@@ -257,8 +276,104 @@ function Panel.Restyle()
     panel.title:SetPoint("RIGHT", panel.bar, "RIGHT", -TITLE_H, 0)
     UI.paintEdges(panel.map.edges, UI.colour("muted"), 0.45)
     UI.paintEdges(panel.art.edges, UI.colour("muted"), 0.45)
+    local c = UI.colour("muted")
+    panel.mats.rule:SetVertexColor(c[1], c[2], c[3], 0.5)
     local a = UI.colour("accent")
     panel.map.ring:SetVertexColor(a[1], a[2], a[3], 0.55)
+end
+
+local MATS_ROW, MATS_EACH, MATS_SUM = 20, 92, 0   -- row height; right edges of the price columns
+
+local function matsRow(mats, i)
+    local UI = ns.Window.UI
+    local row = mats.rows[i]
+    if row then return row end
+    row = { name = UI.Text(mats, 13, "text"), each = UI.Text(mats, 13, "muted"), sum = UI.Text(mats, 13, "text") }
+    local y = -(16 + (i - 1) * MATS_ROW)
+    row.name:SetPoint("TOPLEFT", mats, "TOPLEFT", 0, y)
+    row.name:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -(MATS_EACH + 70), y)
+    row.each:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -MATS_EACH, y)
+    row.sum:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -MATS_SUM, y)
+    row.each:SetJustifyH("RIGHT")
+    row.sum:SetJustifyH("RIGHT")
+    -- The whole row is the item: its tooltip, shift-click links it (or searches it in the open auction house).
+    local hit = CreateFrame("Button", nil, mats)
+    hit:SetPoint("TOPLEFT", mats, "TOPLEFT", 0, y + 2)
+    hit:SetPoint("TOPRIGHT", mats, "TOPRIGHT", 0, y + 2)
+    hit:SetHeight(MATS_ROW)
+    hit:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink("item:" .. self.id)
+        GameTooltip:Show()
+    end)
+    hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    hit:SetScript("OnClick", function(self)
+        local link = C_Item and C_Item.GetItemInfo and select(2, C_Item.GetItemInfo(self.id))
+        if link and IsModifiedClick and IsModifiedClick("CHATLINK") and HandleModifiedItemClick then
+            HandleModifiedItemClick(link)
+        end
+    end)
+    row.hit = hit
+    mats.rows[i] = row
+    return row
+end
+
+-- The reagents table of a craft, its sum and what to do about missing or old prices.
+function Panel.ShowMats(drop)
+    local mats, P = panel.mats, ns.Prices
+    mats.headName:SetPoint("TOPLEFT", mats, "TOPLEFT", 0, 0)
+    mats.headEach:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -MATS_EACH, 0)
+    mats.headSum:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -MATS_SUM, 0)
+    mats.headEach:SetText(L.MATS_EACH)
+    mats.headSum:SetText(L.MATS_LINE)
+    local reagents, counts = drop.reagents or {}, drop.counts or {}
+    for i, id in ipairs(reagents) do
+        local row = matsRow(mats, i)
+        local name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(id)
+        if not name and C_Item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
+        local n, price = counts[i] or 1, P.Get(id)
+        row.name:SetText(("%d× %s"):format(n, name or ("#" .. id)))
+        row.hit.id = id
+        row.each:SetText(price and P.Money(price) or "–")
+        row.sum:SetText(price and P.Money(price * n) or "–")
+        for _, fs in pairs(row) do fs:Show() end
+    end
+    for i = #reagents + 1, #mats.rows do
+        for _, fs in pairs(mats.rows[i]) do fs:Hide() end
+    end
+    local y = -(16 + #reagents * MATS_ROW + 2)
+    mats.rule:SetPoint("TOPLEFT", mats, "TOPLEFT", 0, y)
+    mats.rule:SetPoint("TOPRIGHT", mats, "TOPRIGHT", 0, y)
+    local sum, all, at = P.Total(reagents, counts)
+    mats.totalLabel:SetPoint("TOPLEFT", mats, "TOPLEFT", 0, y - 6)
+    mats.total:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -MATS_SUM, y - 6)
+    mats.totalLabel:SetText(L.MATS_SUM)
+    mats.total:SetText(sum > 0 and P.Money(sum) or "–")
+    mats.age:SetPoint("TOPRIGHT", mats.total, "BOTTOMRIGHT", 0, -3)
+    mats.age:SetText(at and L.MATS_AGE:format(P.Age(at)) or "")
+    local hints = {}
+    if sum == 0 and #reagents > 0 then hints[#hints + 1] = L.MATS_NONE
+    elseif not all then hints[#hints + 1] = L.MATS_SOME end
+    if at and time() - at >= 2 * 86400 then hints[#hints + 1] = L.MATS_OLD end
+    local above = nil
+    for i, fs in ipairs(mats.hints) do
+        fs:ClearAllPoints()
+        if above then
+            fs:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -8)
+            fs:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -8)
+        else
+            fs:SetPoint("TOPLEFT", mats, "TOPLEFT", 0, y - 44)
+            fs:SetPoint("TOPRIGHT", mats, "TOPRIGHT", 0, y - 44)
+        end
+        fs:SetText(hints[i] or "")
+        above = fs
+    end
+    mats:SetHeight(-y + 44)
+end
+
+-- Shown again with what it shows (new prices).
+function Panel.Refresh()
+    if panel and panel:IsShown() and panel.entry then Panel.Show(panel.parent, panel.entry, panel.onClose) end
 end
 
 function Panel.IsShown() return panel ~= nil and panel:IsShown() end

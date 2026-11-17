@@ -284,6 +284,11 @@ C_AddOns = {
             AtlasLoot.ItemDB.Storage[name] = M.crafting
             return true
         end
+        if name == "AtlasLootClassic_Collections" and M.addons.AtlasLootClassic and M.world then
+            M.addons[name] = true
+            AtlasLoot.ItemDB.Storage[name] = { WorldEpics = M.world }
+            return true
+        end
         if name == "AtlasLootClassic_DungeonsAndRaids" and M.addons.AtlasLootClassic then
             M.addons[name] = true
             return true

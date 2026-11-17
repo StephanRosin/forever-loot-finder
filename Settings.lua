@@ -25,9 +25,10 @@ Settings.DEFAULTS = {
     filterRaids = true,
     filterQuests = true,
     filterCrafting = true,
+    filterWorld = true,
     filterBetter = false,       -- only better than (or alternatives to) what is worn
     filterAlternatives = true,  -- with "better": the unclear ones too
-    sort = "ILVL",              -- Filter.SORTS
+    sort = "POINTS",            -- Filter.SORTS
 }
 
 Settings.RANGES = {
@@ -103,7 +104,7 @@ end
 function Settings.Reset()
     local old = ns.DB()
     ForeverLootFinderDB = { language = old.language, theme = old.theme, themeColors = old.themeColors,
-        themeAdopted = old.themeAdopted }
+        themeAdopted = old.themeAdopted, prices = old.prices }
     Settings.Changed(nil)
 end
 

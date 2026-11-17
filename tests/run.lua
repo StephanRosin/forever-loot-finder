@@ -65,12 +65,19 @@ M.atlas.TheDeadmines = { name = "The Deadmines|TInterface\\ltn4:18|t", ContentTy
 M.atlas.MoltenCore = { MapID = 2717, ContentType = 2, items = {
     { name = "Garr", npcID = 2, [2] = { { 1, 103 }, { 2, 104 }, { 3, 107 }, { 4, 106 }, { 5, 110 }, { 6, 111 },
         { 7, 112 }, { 8, 108 }, { 9, 109 }, { 10, 113 }, { 11, 101 }, { 12, 120 }, { 13, 121 }, { 14, 122 }, { 15, 123 }, { 16, 124 },
-        { 17, 125 }, { 18, 126 }, { 19, 127 }, { 20, 207 } } },
+        { 17, 125 }, { 18, 126 }, { 19, 127 }, { 20, 207 }, { 21, 128 }, { 22, 129 } } },
     { name = "Twins", npcID = { 3, 4 }, [2] = { { 1, 110 }, { 2, 208 } } },
     { name = "Horde Only Quest Rewards", ExtraList = true, [2] = { { 1, 102 } } },
     { name = "Tier 1 Sets", ExtraList = true, IgnoreAsSource = true, [2] = { { 1, 201 } } },
 } }
 
+M.items[128] = item("Robe of the Archmage", 4, 62, 57, "INVTYPE_ROBE", 4, 1, { [HEAL] = 30, [DMG] = 30, ITEM_MOD_INTELLECT_SHORT = 20 },
+    { tip = { "Classes: Mage" } })
+M.items[129] = item("Coloured Vestments", 4, 62, 57, "INVTYPE_ROBE", 4, 1, { [HEAL] = 30, ITEM_MOD_INTELLECT_SHORT = 20 },
+    { tip = { "Classes: |cffffffffPriest|r" } })
+-- A world epic (AtlasLoot Collections).
+M.items[160] = item("Wandering Charm", 4, 63, 58, "INVTYPE_TRINKET", 4, 0, { [HEAL] = 30 })
+M.world = { items = { { name = "Trinkets", [1] = { { 1, 160 } } } } }
 M.items[150] = item("Tailored Robe", 3, 58, 52, "INVTYPE_ROBE", 4, 1, { [HEAL] = 20, ITEM_MOD_INTELLECT_SHORT = 12 })
 M.items[14047] = item("Runecloth", 1, 50, 0, "", 7, 0, {})
 -- DungeonJournal: quest rewards, entrances, boss models.
@@ -133,9 +140,13 @@ check("first login wears the hub's theme", adopted, "PITWALL/" .. hubColor)
 check("only once", again, "CLASSIC")
 
 section("Source")
+local listed = {}
+for _, id in ipairs(Source.WORLD_DROPS) do listed[id] = true end
+check("Wowhead world drops: Uther's Strength listed", listed[11302], true)
+Source.WORLD_DROPS = {}   -- the fixtures only
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 28)
+check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 31)
 local twins
 for _, d in ipairs(Source.ByItem(110)) do if d.boss == "Twins" then twins = d end end
 check("several npc ids: the first", twins and twins.npcID, 3)
@@ -168,6 +179,14 @@ check("healing robe", got[104] ~= nil, true)
 check("staff", got[107] ~= nil, true)
 check("trinket without stats: unclear", got[106] and got[106].unclear, true)
 check("not loaded: unclear", got[111] and got[111].unclear, true)
+local hidden = got[111].item
+check("asked for: still loading", ns.Items.NoData(hidden), false)
+M.state.time = M.state.time + ns.Items.WAIT
+check("no answer in time: no data", ns.Items.NoData(hidden), true)
+M.state.time = M.state.time - ns.Items.WAIT
+hidden.failed = true
+check("the server says none: no data", ns.Items.NoData(hidden), true)
+hidden.failed = nil
 check("plate: not wearable", got[103], nil)
 check("attack power cloak: excluded", got[105], nil)
 check("leather: not wearable", got[108], nil)
@@ -176,6 +195,13 @@ check("unknown to the client counted (and one without any data)", unknown, 2)
 check("no stats, no effect: not listed", got[207], nil)
 check("drops of both places", #got[101].drops, 2)
 check("sorted by item level", list[1].item.ilvl, 66)
+check("points sort without a slot: item level", ns.Filter.SortFor("POINTS", nil), "ILVL")
+local bySlot = run({ slot = "TRINKET" })
+local ordered = true
+for i = 2, #bySlot do
+    if (bySlot[i].points or -1) > (bySlot[i - 1].points or -1) then ordered = false end
+end
+check("points sort in a slot: best first", ordered and #bySlot > 1, true)
 check("only the kept unloaded one asked for", table.concat(M.requested, ","), "111")
 Settings.Set("filterNow", false)
 check("not 'now': level 70 shown", ids(run({}))[109] ~= nil, true)
@@ -194,6 +220,11 @@ Settings.Set("filterDungeons", true)
 
 section("Crafting")
 check("crafted item read", Source.ByItem(150)[1].craft, true)
+check("world drop read", Source.ByItem(160)[1].world, true)
+check("world drop listed", ids(run({ class = "PRIEST", roles = { HEAL = true } }))[160] ~= nil, true)
+Settings.Set("filterWorld", false)
+check("world drops off", ids(run({ class = "PRIEST", roles = { HEAL = true } }))[160], nil)
+Settings.Set("filterWorld", true)
 check("profession and skill", Source.ByItem(150)[1].instance .. " " .. Source.ByItem(150)[1].skill, "Tailoring 250")
 check("a spell without data left out", #Source.Drops() > 0, true)
 check("crafted listed", ids(run({}))[150] ~= nil, true)
@@ -262,8 +293,28 @@ check("search is global: other armour too", got[108] ~= nil and got[110] ~= nil,
 ns.Window.Open()
 ns.Window.State().text = "plate"
 check("global hit without a role draws", pcall(ns.Window.Update), true)
+local F = ns.Window.Frame()
+F.heads.ilvl:GetScript("OnClick")(F.heads.ilvl)
+check("header click: item level", Settings.Get("sort"), "ILVL")
+F.heads.points:GetScript("OnClick")(F.heads.points)
+check("header click: points again", Settings.Get("sort"), "POINTS")
+check("value and verdict headers do not sort", F.heads.value:GetScript("OnClick"), nil)
 check("global hit listed", #ns.Window.Entries() > 0 and #ns.Window.Entries()[1].roles, 0)
 ns.Window.State().text = ""
+ns.Window.Update()
+ns.Window.State().offset = 3
+ns.Window.Update()
+check("items arriving keep the scroll place", ns.Window.State().offset, 3)
+Settings.Set("filterRaids", false)
+check("another filter: list back to the top", ns.Window.State().offset, 0)
+Settings.Set("filterRaids", true)
+check("coloured class name: for a priest", ids(run({ class = "PRIEST", roles = { HEAL = true } }))[129] ~= nil, true)
+check("coloured class name: not for a druid", ids(run({ class = "DRUID", roles = { HEAL = true } }))[129], nil)
+check("healing spirit: priest (Meditation, Spiritual Guidance)", ns.Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 10)
+check("healing spirit: druid (Reflection, Living Spirit)", ns.Rules.Points("HEAL", { SPI = 10 }, "DRUID"), 7)
+check("class-only robe: not for a priest", ids(run({ class = "PRIEST", roles = { HEAL = true } }))[128], nil)
+check("class-only robe: for a mage", ids(run({ class = "MAGE", roles = { CASTER = true } }))[128] ~= nil, true)
+check("class-only robe: found by a search", ids(run({ class = "PRIEST", text = "archmage" }))[128] ~= nil, true)
 check("search ignores slot and sources", ids(run({ slot = "TRINKET", dungeons = false, text = "robe" }))[104] ~= nil, true)
 Settings.Set("filterBestArmor", true)
 check("best armour: cloth robe stays", ids(run({}))[104] ~= nil, true)
@@ -416,7 +467,72 @@ check("panel: art plays into sheet 2", P.art.sheets[2]:GetAlpha() == 1 and P.art
 check("art for a TBC table", ns.Panel.ArtFor("LeatherworkingBC"), "Leatherworking")
 check("art for engineering", ns.Panel.ArtFor("EngineeringBC"), "Engineering")
 check("no art for cooking", ns.Panel.ArtFor("Cooking"), nil)
-check("panel: reagents", P.whoDetail:GetText(), "6× Runecloth, 1× #14341")
+local mats = P.mats
+check("panel: reagents table", mats.rows[1].name:GetText() .. " / " .. mats.rows[2].name:GetText(), "6× Runecloth / 1× #14341")
+M.linked = nil
+IsModifiedClick = function(what) return what == "CHATLINK" end
+mats.rows[1].hit:GetScript("OnClick")(mats.rows[1].hit)
+IsModifiedClick = function() return false end
+check("panel: shift-click links a reagent", M.linked ~= nil and M.linked:find("14047") ~= nil, true)
+check("panel: no prices yet: hint", mats:IsShown() and mats.hints[1]:GetText(), ns.L.MATS_NONE)
+-- The auction house: two Runecloth auctions (stacks of 20 at 2g, of 10 at 1g 50s).
+local Prices = ns.Prices
+GetRealmName = function() return "Testrealm" end
+local auctions = { { 20, 20000, 14047 }, { 10, 15000, 14047 }, { 1, 0, 14341 } }
+C_AuctionHouse = {
+    ReplicateItems = function() M.replicated = (M.replicated or 0) + 1 end,
+    GetNumReplicateItems = function() return #auctions end,
+    GetReplicateItemInfo = function(i)
+        local a = auctions[i + 1]
+        return "x", 1, a[1], 1, true, 1, nil, 0, 0, a[2], 0, nil, nil, nil, nil, 0, a[3], true
+    end,
+}
+AuctionHouseFrame = CreateFrame("Frame")
+M.Fire("ADDON_LOADED", "Blizzard_AuctionHouseUI")
+local scan
+for _, f in ipairs(M.frames) do if f._parent == AuctionHouseFrame then scan = f end end
+check("scan button on the auction house", scan ~= nil and scan:IsEnabled() ~= false, true)
+scan:GetScript("OnClick")(scan)
+check("scan fetches every auction", M.replicated, 1)
+scan:GetScript("OnEvent")(scan, "REPLICATE_ITEM_LIST_UPDATE")
+check("cheapest per unit", Prices.Get(14047), 1000)
+check("no buyout: no price", Prices.Get(14341), nil)
+check("then 20 minutes to wait", Prices.Wait() > 19 * 60 and scan:IsEnabled() == false, true)
+M.RunTimers()   -- the 60 s timeout of that scan: already answered, nothing to do
+check("answered scan keeps its cooldown", Prices.Wait() > 19 * 60, true)
+local saved = ForeverLootFinderDB.prices["Testrealm-Alliance"]
+saved.asked = 0
+auctions = {}
+scan:GetScript("OnClick")(scan)
+scan:GetScript("OnEvent")(scan, "REPLICATE_ITEM_LIST_UPDATE")
+check("an empty answer keeps the prices", Prices.Get(14047), 1000)
+saved.asked = 0
+scan:GetScript("OnClick")(scan)
+M.RunTimers()   -- no answer within 60 s
+check("no answer: button free again", Prices.Wait(), 0)
+scan:GetScript("OnClick")(scan)
+scan:GetScript("OnHide")(scan)
+check("AH closed while scanning: button free again", Prices.Wait(), 0)
+M.timers = {}
+saved.asked = time()
+check("money: no copper", Prices.Money(123456), "12|cffffd700g|r 34|cffc7c7cfs|r")
+check("money: copper only under a silver", Prices.Money(56), "56|cffeda55fc|r")
+ns.Panel.Refresh()
+check("panel: price each and line total", mats.rows[1].each:GetText() .. " / " .. mats.rows[1].sum:GetText(),
+    Prices.Money(1000) .. " / " .. Prices.Money(6000))
+check("panel: no price: dash", mats.rows[2].each:GetText(), "–")
+check("panel: sum of those with a price", mats.total:GetText(), Prices.Money(6000))
+check("fresh prices, one missing: only that hint", mats.hints[1]:GetText(), ns.L.MATS_SOME)
+ForeverLootFinderDB.prices["Testrealm-Alliance"].at = time() - 3 * 86400
+ns.Panel.Refresh()
+check("prices older than 2 days: second hint", mats.hints[2]:GetText(), ns.L.MATS_OLD)
+Auctionator = { API = { v1 = { GetAuctionPriceByItemID = function(_, id) return id == 14341 and 500 or nil end } } }
+check("Auctionator's price first", Prices.Get(14341), 500)
+Auctionator.API.v1.GetAuctionAgeByItemID = function() return 3 end
+check("Auctionator's age in days", select(2, Prices.Get(14341)) <= time() - 3 * 86400, true)
+Auctionator = { API = { v1 = { GetAuctionPriceByItemLink = function(_, link) return link == "item:14341" and 700 or nil end } } }
+check("Auctionator by link", Prices.Get(14341), 700)
+Auctionator = nil
 P.bar.close:GetScript("OnClick")(P.bar.close)
 check("panel: closed by its ×", ns.Panel.IsShown(), false)
 check("themes switch", ns.Themes.Switch("PITWALL"), true)
@@ -503,10 +619,43 @@ local function tank2h(class)
 end
 check("two-hander: not for a warrior tank", tank2h("WARRIOR"), nil)
 check("two-hander: for a bear", tank2h("DRUID") ~= nil, true)
+-- Caster weapons: a staff against mace + orb, a mace beside a worn staff.
+M.items[210] = item("Healing Mace", 3, 60, 55, "INVTYPE_WEAPON", 2, 4, { [HEAL] = 30 })
+M.items[211] = item("Healing Orb", 3, 60, 55, "INVTYPE_HOLDABLE", 4, 0, { [HEAL] = 20 })
+M.items[212] = item("Healing Staff", 4, 62, 55, "INVTYPE_2HWEAPON", 2, 10, { [HEAL] = 45 })
+M.items[213] = item("Worn Staff", 3, 55, 50, "INVTYPE_2HWEAPON", 2, 10, { [HEAL] = 20 })
+M.atlas.MoltenCore.items[#M.atlas.MoltenCore.items + 1] = { name = "Staff Boss", npcID = 10, [2] = { { 1, 212 }, { 2, 210 } } }
+Source.Reset()
+Source.Load()
+local function weapons()
+    return ids(run({ class = "PRIEST", roles = { HEAL = true }, slot = "MAINHAND", better = true, now = false }))
+end
+M.state.worn = { [16] = 210, [17] = 211 }
+check("staff vs mace + orb: both hands summed", Filter.Against(Rules.SLOT.MAINHAND, nil, "HEAL", "PRIEST", M.items[212]).stats.HEAL, 50)
+check("staff (45) vs mace + orb (50): no upgrade, an alternative", weapons()[212] and weapons()[212].verdict, "ALT")
+M.state.worn = { [16] = 213 }
+check("staff over a worn staff: upgrade", weapons()[212] and weapons()[212].verdict, "UPGRADE")
+check("mace beside a worn staff: only an alternative", weapons()[210] and weapons()[210].verdict, "ALT")
+M.state.worn = {}
 check("dodge item: not for a druid's melee DPS", (Rules.ForRole("MELEE", Rules.Stats({ ITEM_MOD_AGILITY_SHORT = 10,
     ITEM_MOD_DODGE_RATING_SHORT = 12 }), "DRUID")), false)
 check("defense item: not for a warrior's DPS", ids(run({ class = "WARRIOR", roles = { MELEE = true }, slot = Rules.SLOT.MAINHAND,
     better = false, now = false }))[209] ~= nil, false)
+local eph = {}
+check("on use: known trinket", Rules.AddUse(18820, eph), true)
+check("on use: 175 for 15 of 90 sec at 75 %", eph.HEAL, 175 * 15 / 90 * 0.75)
+local orb = { MP5 = 2 }
+Rules.AddUse(20512, orb)
+check("on use: mana spread as mp5", math.floor(orb.MP5 * 100 + 0.5) / 100, 2 + 4.25)
+check("on use: unknown trinket", Rules.AddUse(1, {}), false)
+local tap = {}
+Rules.AddUse(18371, tap)
+check("Mindtap: not for damage casters (mana only, less intellect)", (Rules.ForRole("CASTER", tap, "PRIEST")), false)
+check("Mindtap: for healers", (Rules.ForRole("HEAL", tap, "PRIEST")), true)
+check("damage casters: no points for mp5", Rules.Points("CASTER", { MP5 = 10 }, "SHAMAN"), 0)
+M.items[18820] = item("Talisman of Ephemeral Power", 4, 66, 0, "INVTYPE_TRINKET", 4, 0, {})
+local tal = ns.Items.Get(18820)
+check("only a Use effect: now with points", tal.onUse and ns.Rules.HasStats(tal.stats), true)
 check("label: warrior DPS", Rules.RoleLabelKey("WARRIOR", "MELEE"), "ROLE_DPS")
 check("label: priest DPS", Rules.RoleLabelKey("PRIEST", "CASTER"), "ROLE_DPS")
 check("label: druid melee DPS", Rules.RoleLabelKey("DRUID", "MELEE"), "ROLE_MELEE_DPS")

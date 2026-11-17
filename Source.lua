@@ -22,6 +22,7 @@ ns.Source = Source
 local drops, byItem, sourceName, journalByNpc
 local MODULE, CORE = "AtlasLootClassic_DungeonsAndRaids", "AtlasLootClassic"
 local CRAFT_MODULE = "AtlasLootClassic_Crafting"
+local WORLD_MODULE, WORLD_TABLE = "AtlasLootClassic_Collections", "WorldEpics"
 local QUEST_QUALITY = 3
 
 local function journal()
@@ -116,6 +117,46 @@ local function bossItems(boss, add)
             end
         end
     end
+end
+
+-- Blue and purple world drops from level 30 that Wowhead's Forever database knows
+-- (source "drop", no creature or zone named); AtlasLoot lists only the epics.
+-- shortcut: a snapshot (November 2026), refresh by hand when Forever adds world drops.
+Source.WORLD_DROPS = {
+    647, 754, 809, 810, 811, 812, 867, 868, 869, 870, 871, 873, 934, 936, 937, 940, 942, 943, 944, 1168, 1169,
+    1203, 1204, 1263, 1265, 1315, 1443, 1447, 1607, 1713, 1714, 1715, 1716, 1718, 1720, 1721, 1722, 1726, 1979,
+    1980, 1981, 1982, 2099, 2100, 2163, 2164, 2244, 2246, 2276, 2277, 2291, 2564, 2565, 2802, 2815, 2824, 2825,
+    2915, 2951, 3075, 4090, 4091, 4696, 5266, 5267, 6622, 6660, 7734, 8006, 8190, 9381, 9384, 9385, 9386, 9393,
+    9402, 9406, 9420, 9428, 9433, 9434, 9435, 10573, 10582, 10584, 10623, 10624, 10625, 10627, 10634, 11302,
+    12103, 13000, 13001, 13002, 13003, 13004, 13006, 13007, 13008, 13009, 13013, 13014, 13015, 13017, 13018,
+    13020, 13021, 13022, 13023, 13025, 13026, 13027, 13028, 13029, 13030, 13034, 13035, 13036, 13038, 13039,
+    13040, 13042, 13043, 13044, 13045, 13046, 13047, 13051, 13052, 13053, 13054, 13055, 13056, 13058, 13059,
+    13060, 13064, 13065, 13066, 13067, 13068, 13070, 13071, 13072, 13073, 13074, 13075, 13076, 13077, 13081,
+    13082, 13083, 13084, 13085, 13088, 13089, 13091, 13093, 13095, 13096, 13100, 13101, 13102, 13103, 13105,
+    13107, 13109, 13110, 13111, 13112, 13113, 13115, 13116, 13117, 13118, 13119, 13120, 13121, 13122, 13123,
+    13124, 13125, 13126, 13128, 13129, 13130, 13132, 13133, 13134, 13135, 13138, 13139, 13144, 13145, 13146,
+    13199, 13358, 14549, 14551, 14552, 14553, 16671, 16681, 16685, 16702, 16710, 16714, 16716, 16736, 17007,
+    23197, 23199, 23203, 24222, 280026, 280027, 280028, 280029, 280031, 280032, 287028, 287029, 287030, 287032,
+    287033, 287034, 287035, 287036, 287044, 287045, 287070,
+}
+
+-- AtlasLoot's world epics (Collections) and the list above: drops of no one boss, anywhere.
+function Source.ReadWorld(content)
+    local list, seen = {}, {}
+    for _, id in ipairs(Source.WORLD_DROPS) do
+        seen[id] = true
+        list[#list + 1] = { item = id, instance = "", world = true, raid = false }
+    end
+    for _, section in ipairs(type(content) == "table" and content.items or {}) do
+        if type(section) == "table" then
+            bossItems(section, function(id)
+                if seen[id] then return end
+                seen[id] = true
+                list[#list + 1] = { item = id, instance = "", world = true, raid = false }
+            end)
+        end
+    end
+    return list
 end
 
 function Source.ReadAtlasLoot(module)
@@ -213,7 +254,7 @@ end
 -- x, y, label, detail } }, nil when the journal does not know it (raids).
 function Source.Place(drop)
     local fdj = journal()
-    if not (fdj and drop) then return nil end
+    if not (fdj and drop) or drop.world then return nil end
     local key = drop.journal or (journalByNpc and drop.npcID and journalByNpc[drop.npcID])
     if not key and fdj.DungeonFromInstanceName then
         local ok, found = pcall(fdj.DungeonFromInstanceName, drop.instance)
@@ -235,17 +276,19 @@ end
 -- else nil and why: "NONE" (no source addon), "COMBAT".
 function Source.Load()
     if drops then return true end
-    local module, crafting
+    local module, crafting, world
     if addonLoaded(CORE) then
-        if not (addonLoaded(MODULE) and addonLoaded(CRAFT_MODULE)) then
+        if not (addonLoaded(MODULE) and addonLoaded(CRAFT_MODULE) and addonLoaded(WORLD_MODULE)) then
             if InCombatLockdown() then return nil, "COMBAT" end
             if not addonLoaded(MODULE) then loadAddon(MODULE) end
             if not addonLoaded(CRAFT_MODULE) then loadAddon(CRAFT_MODULE) end
+            if not addonLoaded(WORLD_MODULE) then loadAddon(WORLD_MODULE) end
         end
         local db = AtlasLoot and AtlasLoot.ItemDB and AtlasLoot.ItemDB.Storage
         module = db and db[MODULE]
         local prof = AtlasLoot.Data and AtlasLoot.Data.Profession
         crafting = db and db[CRAFT_MODULE] and prof and Source.ReadCrafting(db[CRAFT_MODULE], prof)
+        world = Source.ReadWorld(db and db[WORLD_MODULE] and db[WORLD_MODULE][WORLD_TABLE])
     end
     local fdj = journal()
     if not (module or fdj) then return nil, "NONE" end
@@ -254,6 +297,7 @@ function Source.Load()
     local names = {}
     if module then names[#names + 1] = "AtlasLoot Classic Forever" end
     for _, d in ipairs(crafting or {}) do list[#list + 1] = d end
+    for _, d in ipairs(world or {}) do list[#list + 1] = d end
     if fdj then
         for _, d in ipairs(Source.ReadJournal(fdj)) do list[#list + 1] = d end
         names[#names + 1] = "DungeonJournal"

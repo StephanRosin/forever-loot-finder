@@ -32,17 +32,42 @@ local function stats(link)
     return ns.Rules.Stats(fn and link and fn(link) or nil)
 end
 
--- The tooltip's effect lines, the trigger cut off: { kind, text }.
+-- A "Classes: Mage, Warlock" line -> { MAGE = true, WARLOCK = true }, nil without one.
+-- Names may come coloured (|cff...Priest|r); a name that is no class is left out,
+-- and a line naming none leaves the item to everyone rather than to no one.
+local classPrefix, classTokens
+local function classesOf(text)
+    if not classPrefix then
+        classPrefix = (ITEM_CLASSES_ALLOWED or "Classes: %s"):gsub("%%s.*$", "")
+        classTokens = {}
+        for _, token in ipairs(ns.Rules.CLASSES) do classTokens[token:lower()] = token end
+        for _, names in ipairs({ LOCALIZED_CLASS_NAMES_MALE or {}, LOCALIZED_CLASS_NAMES_FEMALE or {} }) do
+            for token, name in pairs(names) do classTokens[name:lower()] = token end
+        end
+    end
+    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    if text:sub(1, #classPrefix) ~= classPrefix then return nil end
+    local set, any = {}, false
+    for name in text:sub(#classPrefix + 1):gmatch("[^,]+") do
+        local token = classTokens[name:gsub("^%s+", ""):gsub("%s+$", ""):lower()]
+        if token then set[token], any = true, true end
+    end
+    return any and set or nil
+end
+
+-- The tooltip's effect lines, the trigger cut off: { kind, text }; and the
+-- classes it is limited to (nil: any).
 local TRIGGERS = { { "USE", "ITEM_SPELL_TRIGGER_ONUSE", "Use:" }, { "EQUIP", "ITEM_SPELL_TRIGGER_ONEQUIP", "Equip:" },
     { "PROC", "ITEM_SPELL_TRIGGER_ONPROC", "Chance on hit:" } }
 local function effects(id)
     local get = C_TooltipInfo and C_TooltipInfo.GetItemByID
     local ok, data = false, nil
     if get then ok, data = pcall(get, id) end
-    local list = {}
+    local list, classes = {}, nil
     for _, line in ipairs(ok and data and data.lines or {}) do
         local text = line.leftText
         if type(text) == "string" then
+            classes = classes or classesOf(text)
             for _, t in ipairs(TRIGGERS) do
                 local prefix = _G[t[2]] or t[3]
                 if text:sub(1, #prefix) == prefix then
@@ -52,13 +77,21 @@ local function effects(id)
             end
         end
     end
-    return list
+    return list, classes
 end
 
+-- How long an asked-for item may take before it counts as "no data".
+Items.WAIT = 10
+
+local notify
 local function request(id)
     if asked[id] then return end
-    asked[id] = true
+    asked[id] = GetTime()
     if C_Item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
+    C_Timer.After(Items.WAIT, function()
+        local item = cache[id]
+        if item and not item.loaded then notify() end   -- its row turns from loading to no data
+    end)
 end
 
 -- What the client knows at once (equip location, class, icon), nil when it
@@ -82,7 +115,13 @@ function Items.Full(item)
     if name then
         item.name, item.link, item.quality, item.ilvl, item.reqLevel = name, link, quality, ilvl, reqLevel or 0
         item.stats, item.otherStats, item.bonusArmor = stats(link)
-        item.effects = ns.Rules.HasStats(item.stats) and {} or effects(item.id)
+        item.onUse = ns.Rules.AddUse(item.id, item.stats)
+        if ns.Rules.HasStats(item.stats) then
+            item.effects = {}
+        else
+            item.effects, item.classes = effects(item.id)
+            item.classesRead = true
+        end
         item.loaded = true
     end
     return item
@@ -90,8 +129,26 @@ end
 
 function Items.Get(id) return Items.Full(Items.Instant(id)) end
 
+-- Whether a loaded item is for the class ("Classes:" on its tooltip). The
+-- tooltip is read once, and only for items the filter still keeps.
+function Items.ForClass(item, class)
+    if not item.classesRead then
+        local _
+        _, item.classes = effects(item.id)
+        item.classesRead = true
+    end
+    return item.classes == nil or item.classes[class] == true
+end
+
 function Items.Request(item)
     if item and not item.loaded then request(item.id) end
+end
+
+-- Asked for, and the server has nothing (said so, or no answer in Items.WAIT seconds).
+function Items.NoData(item)
+    if item.loaded then return false end
+    local at = asked[item.id]
+    return item.failed == true or (at ~= nil and GetTime() - at >= Items.WAIT)
 end
 
 -- What is worn in an inventory slot, nil when empty.
@@ -104,6 +161,7 @@ function Items.Worn(invSlot)
     -- The worn link may carry an enchant: its stats as worn.
     if item and item.loaded then
         local worn = setmetatable({ link = link, stats = (stats(link)) }, { __index = item })
+        ns.Rules.AddUse(id, worn.stats)
         return worn
     end
     return item
@@ -116,9 +174,7 @@ function Items.Reset() cache, asked = {}, {} end
 
 -- Many items arrive in a burst: one notice for all of them, a moment later.
 local pending = false
-local function arrived(id)
-    local item = cache[id]
-    if item then item.loaded = nil end
+function notify()
     if pending then return end
     pending = true
     C_Timer.After(0.2, function()
@@ -130,5 +186,9 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 events:SetScript("OnEvent", function(_, _, id, ok)
-    if ok ~= false and id then arrived(id) end
+    local item = id and cache[id]
+    if item then
+        if ok == false then item.failed = true else item.loaded, item.classesRead = nil, nil end
+    end
+    if id then notify() end
 end)
