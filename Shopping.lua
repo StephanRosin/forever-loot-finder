@@ -133,10 +133,10 @@ end
 -- has it. AtlasLoot's InstanceID where it has one (not Dire Maul, not Forever's
 -- new dungeons), else the name, both in the client's language.
 function Shopping.DropsHere(id)
-    local name, kind, _, _, _, _, _, instanceID = GetInstanceInfo()
-    if kind == nil or kind == "none" then return false end
+    local here = ns.Source.Here()
+    if not here then return false end
     for _, d in ipairs(ns.Source.ByItem(id)) do
-        if d.boss and ((d.instanceID and d.instanceID == instanceID) or d.instance == name) then return true end
+        if ns.Source.IsHere(d, here) then return true end
     end
     return false
 end

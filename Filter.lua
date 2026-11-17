@@ -226,6 +226,8 @@ function Filter.Run(o)
                 local wanted
                 if global then
                     wanted = true
+                elseif o.here then
+                    wanted = ns.Source.IsHere(d, o.here)
                 elseif d.world then
                     wanted = o.world
                 elseif d.craft then
@@ -292,6 +294,8 @@ function Filter.Options(over)
         now = S("filterNow"), bestArmor = S("filterBestArmor"), dungeons = S("filterDungeons"),
         raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), world = S("filterWorld"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"), tankHit = S("filterTankHit"),
         sort = S("sort"), text = "",
+        -- Only the bosses of the dungeon or raid the player is in.
+        here = S("filterHere") and ns.Source.Here() or nil,
     }
     for k, v in pairs(over or {}) do o[k] = v end
     local invSlot = o.invSlot

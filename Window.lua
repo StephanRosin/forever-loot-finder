@@ -704,6 +704,10 @@ local function build()
     end
     frame.sourceChips = chipsOf({ { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
         { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" }, { "filterWorld", "FILTER_WORLD" } })
+    -- Inside a dungeon or raid: its name on the chip.
+    local get, set = setting("filterHere")
+    frame.hereChip = Chip(body, function() return L.FILTER_HERE:format((ns.Source.Here() or {}).name or "") end, get, set)
+    frame.sourceChips[#frame.sourceChips + 1] = frame.hereChip
     frame.filterChips = chipsOf({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
         { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" },
         { "filterTankHit", "FILTER_TANK_HIT" } })
@@ -783,6 +787,8 @@ function Window.Relayout()
     end
     for _, role in ipairs(Rules.ROLES) do frame.roleChips[role]:Relabel() end
     flow(row1, frame, PAD, -(TITLE_H + 10))
+    frame.hereChip:SetShown(ns.Source.Here() ~= nil)
+    frame.hereChip:Relabel()
     flow(frame.sourceChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
     filterRow()
     Window.Update()
@@ -1018,7 +1024,12 @@ events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 events:RegisterEvent("PLAYER_LEVEL_UP")
 events:RegisterEvent("PLAYER_REGEN_ENABLED") -- the loot tables load once combat is over
 events:RegisterEvent("TRACKED_RECIPE_UPDATE") -- the panel's "Track recipe"
+events:RegisterEvent("PLAYER_ENTERING_WORLD")   -- into or out of a dungeon: the "only here" chip
 events:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_ENTERING_WORLD" then
+        if Window.IsShown() then Window.Relayout() end
+        return
+    end
     if event == "PLAYER_REGEN_ENABLED" and loadWhy == "COMBAT" then loadWhy = nil end
     if Window.IsShown() then Window.Update() end
 end)

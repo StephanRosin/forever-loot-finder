@@ -26,6 +26,7 @@ Settings.DEFAULTS = {
     filterQuests = true,
     filterCrafting = true,
     filterWorld = true,
+    filterHere = false,         -- inside a dungeon or raid: only its bosses' loot
     filterBetter = false,       -- only better than (or alternatives to) what is worn
     filterAlternatives = true,  -- with "better": the unclear ones too
     sort = "POINTS",            -- Filter.SORTS

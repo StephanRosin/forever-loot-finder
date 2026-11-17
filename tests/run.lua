@@ -791,6 +791,30 @@ do
     check("retry: stays loaded meanwhile", it.loaded, true)
 end
 
+-- Only the dungeon or raid the player is in.
+do
+    local Source = ns.Source
+    check("here: nothing outside", Source.Here(), nil)
+    M.state.instance = { name = "The Deadmines", kind = "party", id = 36 }
+    local here = run({ here = Source.Here() })
+    local only = true
+    for _, e in ipairs(here) do
+        for _, d in ipairs(e.drops) do if d.instance ~= "The Deadmines" then only = false end end
+    end
+    check("here: only its bosses' loot", only and #here > 0, true)
+    check("here: other raids left out", ids(here)[103], nil)
+    check("here: the setting fills the option", Filter.Options({}).here == nil, true)
+    ns.Settings.Set("filterHere", true)
+    check("here: on inside", Filter.Options({}).here.name, "The Deadmines")
+    M.state.instance = nil
+    check("here: ignored outside", Filter.Options({}).here, nil)
+    ns.Settings.Set("filterHere", false)
+    check("here: a wing counts for its instance", Source.IsHere({ boss = true, instance = "Dire Maul East" },
+        { name = "Dire Maul", id = 429 }), true)
+    check("here: not a longer name", Source.IsHere({ boss = true, instance = "Dire Maulers" },
+        { name = "Dire Maul", id = 429 }), false)
+end
+
 -- The shopping list: per character, counted from the bags, origin from the loot tables.
 do
     local Shop = ns.Shopping

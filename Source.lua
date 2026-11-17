@@ -340,6 +340,23 @@ function Source.LoadAsync(done)
 end
 
 function Source.Drops() return drops or {} end
+
+-- The dungeon or raid the player is in, { name, id }; nil outside.
+function Source.Here()
+    local name, kind, _, _, _, _, _, id = GetInstanceInfo()
+    if kind ~= "party" and kind ~= "raid" then return nil end
+    return { name = name, id = id }
+end
+
+-- Whether a boss drop is from there: AtlasLoot's InstanceID, else the name
+-- (both in the client's language); a wing ("Dire Maul East") counts for its
+-- instance ("Dire Maul"), which the game does not tell apart.
+function Source.IsHere(d, here)
+    if not (d.boss and here) then return false end
+    if d.instanceID and d.instanceID == here.id then return true end
+    local name = d.instance
+    return name ~= nil and (name == here.name or name:sub(1, #here.name + 1) == here.name .. " ")
+end
 function Source.ByItem(id) return byItem and byItem[id] or {} end
 function Source.Name() return sourceName end
 

@@ -28,6 +28,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids, Crafting and Collections 
 - **Wearable now**: only items for your level and the armor types you have learned.
 - **Best armor only**: body armor of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewelry and trinkets always count. Not shown for cloth wearers.
 - **Dungeons**, **raids**, **quests**, **crafting** and **world drops**, each on or off. World drops are AtlasLoot's world epics and the blue and purple world drops Wowhead knows for Forever. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
+- **Only <dungeon>**: inside a dungeon or raid, a chip with its name shows only the loot of its bosses. With **Better than worn** on, that is the list of upgrades you can get here.
 - Trinkets and other items without plain stats are judged by their Use, Equip and Chance-on-hit texts: a weapon proc is out for healers, a Fire spell effect is out for priests.
 - **Better than worn** compares every item with what you wear in its slot (only for your own class); **Alternatives** adds the ones about as good. What you wear is not listed.
 - **Hit items** (tanks only): also lists items with hit that no tank stat would bring in, and marks the hit of every item.
