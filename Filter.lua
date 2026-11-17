@@ -173,7 +173,8 @@ local function compare(sort)
         local la, lb = ia.ilvl or -1, ib.ilvl or -1
         local qa, qb = ia.quality or -1, ib.quality or -1
         local na, nb = ia.name or "", ib.name or ""
-        local pa, pb = a.points or -1, b.points or -1
+        -- What the column shows: the difference to the worn one (two-handers against both hands), else the points.
+        local pa, pb = a.delta or a.points or -math.huge, b.delta or b.points or -math.huge
         if sort == "POINTS" then
             if pa ~= pb then return pa > pb end
             if la ~= lb then return la > lb end

@@ -636,6 +636,11 @@ check("staff (45) vs mace + orb (50): no upgrade, an alternative", weapons()[212
 M.state.worn = { [16] = 213 }
 check("staff over a worn staff: upgrade", weapons()[212] and weapons()[212].verdict, "UPGRADE")
 check("mace beside a worn staff: only an alternative", weapons()[210] and weapons()[210].verdict, "ALT")
+M.state.worn = { [16] = 210, [17] = 211 }
+local w = run({ class = "PRIEST", roles = { HEAL = true }, slot = "MAINHAND", better = true, now = false, sort = "POINTS" })
+local sorted = true
+for i = 2, #w do if (w[i].delta or -1e9) > (w[i - 1].delta or -1e9) then sorted = false end end
+check("points sort in a slot: by the difference shown", sorted and #w > 1, true)
 M.state.worn = {}
 check("dodge item: not for a druid's melee DPS", (Rules.ForRole("MELEE", Rules.Stats({ ITEM_MOD_AGILITY_SHORT = 10,
     ITEM_MOD_DODGE_RATING_SHORT = 12 }), "DRUID")), false)
