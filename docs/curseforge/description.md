@@ -1,6 +1,6 @@
 **Summary**
 
-Find gear for your class, role and equipment slot and see where it comes from: boss and drop chance, quest or profession. From the character window, a search button on every slot lists the upgrades and alternatives to what you wear.
+Find gear for your class, role and equipment slot and see where it comes from: boss and drop chance, world drop, quest or profession, with the reagents' auction house prices. From the character window, a search button on every slot lists the upgrades and alternatives to what you wear.
 
 ---
 
