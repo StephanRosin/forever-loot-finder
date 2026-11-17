@@ -51,6 +51,11 @@ Install both, and keep AtlasLoot's Dungeons and Raids, Crafting and Collections 
 - **Hover** a row for the item's tooltip and, under it, what it gives or takes against what you wear, stat by stat (+14 Spirit, -7 Healing). Hover **Worn now** for the worn item's tooltip.
 - **Shift-click** links the item in chat, **ctrl-click** tries it on.
 
+## Recipes
+- The panel of a crafted item tells where its recipe comes from: from the trainer, a boss or world drop, a quest, or a vendor with name and zone (only vendors of your faction).
+- A recipe you have already learned shows a green check instead.
+- The sources come from Wowhead's Forever recipe lists; creature, vendor and quest names are in English, zones in your language.
+
 ## Reagent prices
 - The panel of a crafted item lists its reagents as a table with the auction house price of each, the cost per craft and the total.
 - Prices come from **Auctionator** when it is installed; without it, a **Scan** button under the auction house window reads all auctions at once (about 10 seconds, at most every 20 minutes).

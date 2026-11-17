@@ -21,7 +21,8 @@ Nothing is copied: the tables are read while playing.
   from `AtlasLootClassic_Crafting`, world epics from `AtlasLootClassic_Collections` (all load on demand, not in
   combat), drop chances from its drop rate data.
 - **Wowhead Forever** (snapshot in `Source.lua`): blue and purple world drops from level 30; trinkets' Use effects
-  as stats in `Rules.lua` (`Rules.ON_USE`), both read by hand from its tooltips.
+  as stats in `Rules.lua` (`Rules.ON_USE`), both read by hand from its tooltips; where recipes come from
+  (`Recipes.lua`: drop, quest, vendors with faction, and the recipe item of Forever's new crafts).
 - **DungeonJournal** (required): its dungeons' quests and their reward items, the dungeon entrances on the world
   map, the bosses' model ids.
 

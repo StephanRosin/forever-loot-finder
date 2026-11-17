@@ -653,6 +653,24 @@ local orb = { MP5 = 2 }
 Rules.AddUse(20512, orb)
 check("on use: mana spread as mp5", math.floor(orb.MP5 * 100 + 0.5) / 100, 2 + 4.25)
 check("on use: unknown trinket", Rules.AddUse(1, {}), false)
+AtlasLoot.Data.Recipe = { GetRecipeForSpell = function(spell)
+    return ({ [1] = 14468, [2] = 253974, [3] = 999999 })[spell] end }
+check("recipe: none, from the trainer", ns.Panel.RecipeText(4), "Recipe: from the trainer")
+check("recipe: drop and vendor with zones", ns.Panel.RecipeText(1),
+    "Recipe: drops from Ice Thistle Yeti (Area618) · vendor Qia (Area618)")
+check("recipe: quest and vendors of a zone", ns.Panel.RecipeText(2), 'Recipe: quest "I Need a Tailor" · vendors in Area405')
+check("recipe: item of unknown origin", ns.Panel.RecipeText(3), nil)
+check("recipe: Forever's new one by the made item", ns.Panel.RecipeText(5, 254095), "Recipe: world drop")
+ns.RECIPE_SOURCES[999998] = { { "VENDOR", "Hordling", 17, 2 }, { "VENDOR", "Ally", 44, 1 }, { "VENDOR", "Goblin", 405, 3 } }
+AtlasLoot.Data.Recipe.GetRecipeForSpell = function(spell) return ({ [1] = 14468, [2] = 253974, [3] = 999999, [6] = 999998 })[spell] end
+check("recipe: only the own faction's vendors", ns.Panel.RecipeText(6), "Recipe: vendor Ally (Area44) · vendor Goblin (Area405)")
+ns.RECIPE_SOURCES[999998][4] = { "VENDOR", "Ally2", 1, 1 }
+check("recipe: more than two vendors counted", ns.Panel.RecipeText(6), "Recipe: vendor Ally (Area44) · vendor Goblin (Area405) · +1 more vendors")
+C_SpellBook = { IsSpellKnown = function(spell) return spell == 1 end }
+check("recipe: learned, a green check", ns.Panel.RecipeText(1):find("You know this recipe", 1, true) ~= nil, true)
+C_SpellBook = nil
+AtlasLoot.Data.Recipe = nil
+check("recipe: without AtlasLoot's table", ns.Panel.RecipeText(1), nil)
 local tap = {}
 Rules.AddUse(18371, tap)
 check("Mindtap: not for damage casters (mana only, less intellect)", (Rules.ForRole("CASTER", tap, "PRIEST")), false)

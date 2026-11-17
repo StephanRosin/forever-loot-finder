@@ -70,7 +70,12 @@ local function build(parent)
 
     local art = CreateFrame("Frame", nil, panel)
     art:SetSize(MAP_W, MODEL_H)
-    art:SetPoint("TOPLEFT", panel.location, "BOTTOMLEFT", 0, -8)
+    -- A craft's recipe source, under its skill.
+    panel.recipe = UI.Text(panel, 11, "text")
+    panel.recipe:SetPoint("TOPLEFT", panel.location, "BOTTOMLEFT", 0, -3)
+    panel.recipe:SetPoint("TOPRIGHT", panel.location, "BOTTOMRIGHT", 0, -3)
+    panel.recipe:SetWordWrap(true)
+    art:SetPoint("TOPLEFT", panel.recipe, "BOTTOMLEFT", 0, -8)
     -- Both sheets stay loaded side by side and only their alpha flips:
     -- SetTexture to the other file each loop showed a black frame while it loaded.
     art.sheets = {}
@@ -112,14 +117,14 @@ local function build(parent)
     mats:SetPoint("TOPLEFT", panel.who, "BOTTOMLEFT", 0, -8)
     mats:SetPoint("TOPRIGHT", panel.who, "BOTTOMRIGHT", 0, -8)
     mats.rows = {}
-    mats.headName, mats.headEach, mats.headSum = UI.Text(mats, 11, "muted"), UI.Text(mats, 11, "muted"), UI.Text(mats, 11, "muted")
+    mats.headName, mats.headEach, mats.headSum = UI.Text(mats, 10, "muted"), UI.Text(mats, 10, "muted"), UI.Text(mats, 10, "muted")
     mats.rule = UI.fill(mats, "ARTWORK")
     mats.rule:SetHeight(1)
-    mats.totalLabel, mats.total = UI.Text(mats, 15, "title"), UI.Text(mats, 15, "title")
-    mats.age = UI.Text(mats, 12, "muted")
+    mats.totalLabel, mats.total = UI.Text(mats, 13, "title"), UI.Text(mats, 13, "title")
+    mats.age = UI.Text(mats, 11, "muted")
     mats.hints = {}
     for i = 1, 2 do
-        mats.hints[i] = UI.Text(mats, 13, "accent")
+        mats.hints[i] = UI.Text(mats, 11, "accent")
         mats.hints[i]:SetWordWrap(true)
     end
     mats:Hide()
@@ -197,6 +202,48 @@ local function pick(entry)
     return entry.drops[1], ns.Source.Place(entry.drops[1])
 end
 
+-- Where the recipe comes from: "Recipe: vendor Qia (Winterspring) · ...", the trainer when the craft
+-- has no recipe item (AtlasLoot's recipe table, ours for Forever's new ones), nil when nothing is known.
+-- A recipe the player has learned: a green check instead.
+function Panel.RecipeText(spellID, made)
+    if not spellID then return nil end
+    if C_SpellBook and C_SpellBook.IsSpellKnown and C_SpellBook.IsSpellKnown(spellID) then
+        return "|TInterface\\Buttons\\UI-CheckBox-Check:16:16:0:-1|t |cff33dd33" .. L.RECIPE_KNOWN .. "|r"
+    end
+    local data = AtlasLoot and AtlasLoot.Data and AtlasLoot.Data.Recipe
+    if not data then return nil end
+    local recipe = data.GetRecipeForSpell(spellID) or ns.RECIPE_FOR_ITEM[made]
+    if not recipe then return L.RECIPE:format(L.RECIPE_TRAINER) end
+    local parts = {}
+    -- Vendors carry their faction (1 Alliance, 2 Horde, 3 both): only the player's, at most two named.
+    local mine = UnitFactionGroup("player") == "Horde" and 2 or 1
+    local vendors = 0
+    for _, s in ipairs(ns.RECIPE_SOURCES[recipe] or {}) do
+        local kind, name, zone, faction = s[1], s[2], s[3], s[4]
+        zone = zone > 0 and C_Map.GetAreaInfo(zone) or nil
+        local skip = kind == "VENDOR" and faction and faction ~= 3 and faction ~= mine
+        if kind == "VENDOR" and not skip then
+            vendors = vendors + 1
+            skip = vendors > 2
+        end
+        local text
+        if kind == "QUEST" then
+            text = L.RECIPE_QUEST:format(name)
+        elseif name ~= "" then
+            text = (kind == "VENDOR" and L.RECIPE_VENDOR or L.RECIPE_DROP):format(name)
+            if zone then text = text .. " (" .. zone .. ")" end
+        elseif kind == "VENDOR" then
+            text = zone and L.RECIPE_VENDORS_IN:format(zone) or L.RECIPE_VENDORS
+        else
+            text = zone and L.RECIPE_DROP_IN:format(zone) or L.RECIPE_WORLD
+        end
+        if not skip then parts[#parts + 1] = text end
+    end
+    if vendors > 2 then parts[#parts + 1] = L.RECIPE_MORE:format(vendors - 2) end
+    if #parts == 0 then return nil end
+    return L.RECIPE:format(table.concat(parts, " · "))
+end
+
 -- Shows the panel beside parent for entry (nil hides it); onClose: its ×.
 function Panel.Show(parent, entry, onClose)
     if not entry then
@@ -219,10 +266,12 @@ function Panel.Show(parent, entry, onClose)
     end
     art.name, art.frame, art.t = artName, nil, 0
     art:SetShown(artName ~= nil)
-    local above = artName and art or (drop.craft or drop.world) and panel.location or panel.entrance
+    local above = artName and art or drop.craft and panel.recipe or drop.world and panel.location or panel.entrance
     panel.who:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -12)
     panel.who:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -12)
     panel.mats:SetShown(drop.craft == true)
+    panel.recipe:SetText(drop.craft and Panel.RecipeText(drop.spellID, drop.item) or "")
+    panel.recipe:SetShown(drop.craft == true)
     if drop.craft then
         panel.title:SetText(drop.instance)
         panel.location:SetText(L.CRAFT_SKILL:format(drop.skill or 0))
@@ -282,16 +331,16 @@ function Panel.Restyle()
     panel.map.ring:SetVertexColor(a[1], a[2], a[3], 0.55)
 end
 
-local MATS_ROW, MATS_EACH, MATS_SUM = 20, 92, 0   -- row height; right edges of the price columns
+local MATS_ROW, MATS_EACH, MATS_SUM = 16, 76, 0   -- row height; right edges of the price columns
 
 local function matsRow(mats, i)
     local UI = ns.Window.UI
     local row = mats.rows[i]
     if row then return row end
-    row = { name = UI.Text(mats, 13, "text"), each = UI.Text(mats, 13, "muted"), sum = UI.Text(mats, 13, "text") }
+    row = { name = UI.Text(mats, 11, "text"), each = UI.Text(mats, 11, "muted"), sum = UI.Text(mats, 11, "text") }
     local y = -(16 + (i - 1) * MATS_ROW)
     row.name:SetPoint("TOPLEFT", mats, "TOPLEFT", 0, y)
-    row.name:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -(MATS_EACH + 70), y)
+    row.name:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -(MATS_EACH + 56), y)
     row.each:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -MATS_EACH, y)
     row.sum:SetPoint("TOPRIGHT", mats, "TOPRIGHT", -MATS_SUM, y)
     row.each:SetJustifyH("RIGHT")
