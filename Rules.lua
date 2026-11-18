@@ -125,7 +125,9 @@ Rules.CLASS_PROFILES = {
     PALADIN = {
         TANK = { weights = { SPELLDMG = 0.3, INT = 0.2, MP5 = 0.5 }, exclude = HYBRID, healingItemsOut = true },
         MELEE = { weights = { SPELLDMG = 0.3, INT = 0.2, AGI = 0.6 }, exclude = HYBRID, healingItemsOut = true },
-        HEAL = { weights = { SPI = 0.1, INT = 0.6, CRIT = 0.8 }, want = { SPI = false } },
+        -- Illumination refunds a crit heal's mana: 1% crit is worth about 20 healing, Divine Intellect
+        -- and ~30 int per 1% crit make intellect nearly a healing point (classic guides: int, crit before mp5).
+        HEAL = { weights = { SPI = 0.1, INT = 0.9, CRIT = 1.2, SCRIT = 1.2 }, want = { SPI = false } },
     },
     SHAMAN = {
         MELEE = { weights = { SPELLDMG = 0.3, INT = 0.2, MP5 = 0.5 }, exclude = HYBRID, healingItemsOut = true },
