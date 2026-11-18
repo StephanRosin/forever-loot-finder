@@ -112,11 +112,12 @@ Rules.PROFILES = {
 -- regeneration while casting; a point of spirit then gives about 0.31 (priest, spirit/4
 -- per tick) or 0.25 x 1.15 Living Spirit (druid, spirit/5) mana per 5 sec, at MP5's 2.5;
 -- the priest's Spiritual Guidance adds 25% of spirit as healing.
+-- Intellect is only a bigger pool and a little crit for them (no Illumination), half the base 0.5.
 local HYBRID = { SPELLDMG = false, HEAL = false, MP5 = false }
 Rules.CLASS_PROFILES = {
-    PRIEST = { HEAL = { weights = { SPI = 1.0 } } },
+    PRIEST = { HEAL = { weights = { SPI = 1.0, INT = 0.25 } } },
     DRUID = {
-        HEAL = { weights = { SPI = 0.7 } },
+        HEAL = { weights = { SPI = 0.7, INT = 0.25 } },
         TANK = { weights = { ARMOR = 0.25, AGI = 0.8, DEF = 0.6, PARRY = 0, BLOCK = 0, BLOCKVAL = 0, DPS = 0, FAP = 0.15 },
             want = { AGI = true, PARRY = false, BLOCK = false, BLOCKVAL = false } },
         MELEE = { weights = { STR = 1.2, FAP = 0.5, DPS = 0 }, want = { FAP = true, DPS = false } },
