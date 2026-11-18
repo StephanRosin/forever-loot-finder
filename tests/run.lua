@@ -552,6 +552,15 @@ check("panel: closed by its ×", ns.Panel.IsShown(), false)
 check("themes switch", ns.Themes.Switch("PITWALL"), true)
 check("still shown under Pitwall", ns.Window.IsShown(), true)
 check("registered for the hub", _G.ForeverThemes ~= nil, true)
+-- HD: each theme on its base's part, every colour its own backdrop, untinted.
+check("HD offered after the others", table.concat(LibForeverThemes.SpecIds(ns.Themes.SPECS), " ", 13),
+    "WOOD_HD TECH_HD PARCHMENT_HD RUNESTONE_HD GLASS_HD COMIC_HD FROST_HD")
+check("glass HD: lighter fill to show the glass", ns.Themes.SPECS.GLASS_HD.art.alpha .. "/"
+    .. ns.Themes.SPECS.GLASS.art.alpha, "60/90")
+check("wood HD switches", ns.Themes.Switch("WOOD_HD"), true)
+check("wood HD: its own backdrop", ns.Themes.Back(ns.Themes.Art()), "WoodHDOak")
+check("wood HD: untinted", table.concat(ns.Themes.Tint(ns.Themes.Art()), ",", 1, 3), "1,1,1")
+check("still shown under Wood HD", ns.Window.IsShown(), true)
 ns.Themes.Switch("CLASSIC")
 ns.Options.Open()
 check("options open", ns.Options.IsShown(), true)
@@ -579,6 +588,14 @@ for _, v in pairs(de) do if type(v) == "string" and v:find("ß", 1, true) then s
 check("no sharp s", sharp, 0)
 for _, slot in ipairs(Rules.SLOTS) do check("slot name " .. slot.key, en["SLOT_" .. slot.key] ~= nil, true) end
 for _, role in ipairs(Rules.ROLES) do check("role " .. role, de["ROLE_" .. role] ~= nil, true) end
+for _, id in ipairs(LibForeverThemes.SpecIds(ns.Themes.SPECS)) do
+    if id ~= "CLASSIC" then
+        check("theme name " .. id, en["THEME_" .. id] ~= nil, true)
+        for _, c in ipairs(LibForeverThemes.COLORS[id] or {}) do
+            check("colour name " .. id .. " " .. c.id, en["THEME_COLOR_" .. id .. "_" .. c.id] ~= nil, true)
+        end
+    end
+end
 
 section("No accidental globals")
 local allowed = { ForeverLootFinderDB = true, ForeverLootFinderChar = true, SLASH_FOREVERLOOTFINDER1 = true,

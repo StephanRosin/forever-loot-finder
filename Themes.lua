@@ -35,7 +35,9 @@ Themes.SPECS = Lib.Specs({
     CONSOLE = { font = "IBM Plex Mono", bodyFont = false, art = look({ 0.9, 0.91, 0.93 }, { 0.06, 0.06, 0.07 }, 0) },
     PITWALL = { font = "Titillium Web SemiBold", bodyFont = false,
         art = look({ 0.95, 0.95, 0.96 }, { 0.039, 0.039, 0.039 }, 100) },
-})
+}, true) -- the HD themes too, each from its base theme's part here
+-- Glass HD is there to show its glass: the dark fill over it at 60 % (Glass: 90 %).
+Themes.SPECS.GLASS_HD.art.alpha = 60
 
 function Themes.Current()
     local id = Settings.Get("theme")
