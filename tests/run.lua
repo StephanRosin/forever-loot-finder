@@ -558,7 +558,7 @@ check("HD offered after the others", table.concat(LibForeverThemes.SpecIds(ns.Th
 check("glass HD: lighter fill to show the glass", ns.Themes.SPECS.GLASS_HD.art.alpha .. "/"
     .. ns.Themes.SPECS.GLASS.art.alpha, "60/90")
 check("wood HD switches", ns.Themes.Switch("WOOD_HD"), true)
-check("wood HD: its own backdrop", ns.Themes.Back(ns.Themes.Art()), "WoodHDOak")
+check("wood HD: its own backdrop", ns.Themes.Back(ns.Themes.Art()), "WoodHDEbony")
 check("wood HD: untinted", table.concat(ns.Themes.Tint(ns.Themes.Art()), ",", 1, 3), "1,1,1")
 check("still shown under Wood HD", ns.Window.IsShown(), true)
 ns.Themes.Switch("CLASSIC")
