@@ -217,6 +217,21 @@ function Filter.Run(o)
     local plain = global and setmetatable({ better = false }, { __index = o }) or o
     local wearLevel = o.now and o.level or nil
     local wanted = o.slot and Rules.SLOT[o.slot]
+    -- "Now": crafts only with the profession at the recipe's skill, quests only from their level and not handed in.
+    local ranks = {}
+    local function canCraft(d)
+        local line = Rules.SKILL_LINE[d.profID]
+        if not (line and C_SkillInfo) then return true end  -- a profession AtlasLoot does not number: kept
+        if ranks[line] == nil then
+            local info = C_SkillInfo.GetSkillLineInfoByID(line)
+            ranks[line] = info and info.rank or 0
+        end
+        return ranks[line] > 0 and ranks[line] >= (d.skill or 0)
+    end
+    local function canQuest(d)
+        return (d.requires or 0) <= o.level
+            and not (d.questID and C_QuestLog.IsQuestFlaggedCompleted(d.questID))
+    end
     for _, drop in ipairs(ns.Source.Drops()) do
         local id = drop.item
         if not seen[id] then
@@ -230,11 +245,14 @@ function Filter.Run(o)
                     wanted = ns.Source.IsHere(d, o.here)
                 elseif d.world then
                     wanted = o.world
+                elseif d.vendor then
+                    wanted = o.vendors
                 elseif d.craft then
-                    wanted = o.crafting
+                    wanted = o.crafting and not (o.now and not canCraft(d))
                 elseif d.quest then
                     wanted = o.quests and (not d.faction or d.faction == "Both" or d.faction == o.faction)
                         and (not d.classOnly or tostring(d.classOnly):upper() == o.class)
+                        and not (o.now and not canQuest(d))
                 else
                     wanted = (d.raid and o.raids) or (not d.raid and o.dungeons)
                 end
@@ -292,7 +310,7 @@ function Filter.Options(over)
     local o = {
         class = class, level = UnitLevel("player") or 60, roles = ns.Settings.Roles(class),
         now = S("filterNow"), bestArmor = S("filterBestArmor"), dungeons = S("filterDungeons"),
-        raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), world = S("filterWorld"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"), tankHit = S("filterTankHit"),
+        raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), world = S("filterWorld"), vendors = S("filterVendors"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"), tankHit = S("filterTankHit"),
         sort = S("sort"), text = "",
         -- Only the bosses of the dungeon or raid the player is in.
         here = S("filterHere") and ns.Source.Here() or nil,

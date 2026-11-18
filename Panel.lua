@@ -296,6 +296,11 @@ function Panel.Show(parent, entry, onClose)
         panel.who:SetText("")
         panel.whoDetail:SetText("")
         model:Hide()
+    elseif drop.vendor then
+        panel.who:SetText(L.VENDOR_NAME:format(drop.vendor))
+        local info = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(drop.currency)
+        panel.whoDetail:SetText(L.VENDOR_COST:format(drop.cost, info and info.name or ""))
+        model:Hide()
     elseif drop.quest then
         panel.who:SetText(L.QUEST_NAME:format(drop.quest))
         panel.whoDetail:SetText(drop.giver and L.QUEST_GIVER:format(drop.giver) or "")

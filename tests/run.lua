@@ -78,6 +78,7 @@ M.items[129] = item("Coloured Vestments", 4, 62, 57, "INVTYPE_ROBE", 4, 1, { [HE
 -- A world epic (AtlasLoot Collections).
 M.items[160] = item("Wandering Charm", 4, 63, 58, "INVTYPE_TRINKET", 4, 0, { [HEAL] = 30 })
 M.world = { items = { { name = "Trinkets", [1] = { { 1, 160 } } } } }
+M.items[170] = item("Vendor Ring", 3, 65, 52, "INVTYPE_FINGER", 4, 0, { [HEAL] = 14, ITEM_MOD_INTELLECT_SHORT = 8 })
 M.items[150] = item("Tailored Robe", 3, 58, 52, "INVTYPE_ROBE", 4, 1, { [HEAL] = 20, ITEM_MOD_INTELLECT_SHORT = 12 })
 M.items[14047] = item("Runecloth", 1, 50, 0, "", 7, 0, {})
 -- DungeonJournal: quest rewards, entrances, boss models.
@@ -88,7 +89,7 @@ ForeverDungeonJournal_NS = {
     DB = { ["The Deadmines"] = { location = "Westfall", bosses = { { name = "Cookie", npcID = 1 } },
         entrance = { mapID = 1436, x = 0.42, y = 0.71, label = "The Deadmines Entrance", detail = "In Moonbrook" },
         quests = {
-            { name = "Red Silk Bandanas", id = 214, pickup = "Scout Riell", faction = "Alliance", rewardChoice = true,
+            { name = "Red Silk Bandanas", id = 214, requires = 17, pickup = "Scout Riell", faction = "Alliance", rewardChoice = true,
                 rewardItems = { { 130, "Quest Robe", 3 }, { 131, "Green Thing", 2 } } },
             { name = "Horde Only", faction = "Horde", rewardItems = { { 132, "Horde Ring", 3 } } },
         } } },
@@ -144,9 +145,11 @@ local listed = {}
 for _, id in ipairs(Source.WORLD_DROPS) do listed[id] = true end
 check("Wowhead world drops: Uther's Strength listed", listed[11302], true)
 Source.WORLD_DROPS = {}   -- the fixtures only
+check("Undermine vendor: Adaptive Combat Assistant 125", Source.VENDOR.items[272437], 125)
+Source.VENDOR.items = { [170] = 75 }
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped (with quest rewards and a craft)", #Source.Drops(), 31)
+check("headers skipped (with quest rewards, a craft and a vendor item)", #Source.Drops(), 32)
 local twins
 for _, d in ipairs(Source.ByItem(110)) do if d.boss == "Twins" then twins = d end end
 check("several npc ids: the first", twins and twins.npcID, 3)
@@ -217,6 +220,16 @@ Settings.Set("filterQuests", true)
 Settings.Set("filterDungeons", false)
 check("dungeons off: quests stay", ids(run({}))[130] ~= nil, true)
 Settings.Set("filterDungeons", true)
+local level = M.state.level
+M.state.level = 16
+check("now: quest above the level out", ids(run({ level = 16 }))[130], nil)
+Settings.Set("filterNow", false)
+check("not now: quest above the level shown", ids(run({ level = 16 }))[130] ~= nil, true)
+Settings.Set("filterNow", true)
+M.state.level = level
+M.questsDone[214] = true
+check("now: handed-in quest out", ids(run({}))[130], nil)
+M.questsDone[214] = nil
 
 section("Crafting")
 check("crafted item read", Source.ByItem(150)[1].craft, true)
@@ -228,9 +241,26 @@ Settings.Set("filterWorld", true)
 check("profession and skill", Source.ByItem(150)[1].instance .. " " .. Source.ByItem(150)[1].skill, "Tailoring 250")
 check("a spell without data left out", #Source.Drops() > 0, true)
 check("crafted listed", ids(run({}))[150] ~= nil, true)
+M.skills[197] = 249
+check("now: skill below the recipe out", ids(run({}))[150], nil)
+M.skills[197] = nil
+check("now: profession not learned out", ids(run({}))[150], nil)
+Settings.Set("filterNow", false)
+check("not now: crafts without the profession", ids(run({}))[150] ~= nil, true)
+Settings.Set("filterNow", true)
+M.skills[197] = 300
 Settings.Set("filterCrafting", false)
 check("crafting off", ids(run({}))[150], nil)
 Settings.Set("filterCrafting", true)
+
+section("Vendor")
+local vendor = Source.ByItem(170)[1]
+check("vendor read", vendor and vendor.vendor .. " " .. vendor.cost, "Pix Xizzix 75")
+check("vendor listed", ids(run({}))[170] ~= nil, true)
+check("vendor on the map", Source.Place(vendor).entrance.mapID, 1434)
+Settings.Set("filterVendors", false)
+check("vendors off", ids(run({}))[170], nil)
+Settings.Set("filterVendors", true)
 
 section("Healing and spell damage")
 got = ids(run({ roles = { CASTER = true } }))

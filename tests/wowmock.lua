@@ -275,6 +275,7 @@ end
 function IsModifiedClick() return false end
 function HandleModifiedItemClick(link) M.linked = link end
 C_Map = { GetAreaInfo = function(id) return "Area" .. id end,
+    GetMapInfo = function(id) return { name = "Map" .. id } end,
     GetMapArtLayers = function(id)
         if id ~= 1436 then return nil end
         return { { layerWidth = 1002, layerHeight = 668, tileWidth = 256, tileHeight = 256 } }
@@ -321,6 +322,11 @@ M.atlas = module
 -- Crafting: a profession's recipes as spell ids; Profession data per spell.
 M.crafting = { Tailoring = { name = "Tailoring", items = { { name = "Robes", [1] = { { 1, 7001 }, { 2, 7002 } } } } } }
 M.professions = { [7001] = { 150, 8, 250, 260, 280, { 14047, 14341 }, { 6, 1 } } }
+-- The character's skill lines by id (rank), handed-in quests.
+M.skills, M.questsDone = { [197] = 300 }, {}
+C_SkillInfo = { GetSkillLineInfoByID = function(id) return M.skills[id] and { rank = M.skills[id] } or nil end }
+C_QuestLog = C_QuestLog or {}
+C_QuestLog.IsQuestFlaggedCompleted = function(id) return M.questsDone[id] == true end
 AtlasLoot.Data.Profession = { GetProfessionData = function(id) return M.professions[id] end }
 
 -- The character window's slot buttons.

@@ -140,6 +140,31 @@ Source.WORLD_DROPS = {
     287033, 287034, 287035, 287036, 287044, 287045, 287070,
 }
 
+-- Pix Xizzix in Booty Bay: gear for Tarnished Undermine Reals (currency 3469), item = price.
+-- shortcut: a snapshot of Wowhead Forever's currency page (November 2026), refresh by hand when the vendor changes.
+Source.VENDOR = {
+    npc = "Pix Xizzix", place = "Booty Bay", currency = 3469,
+    entrance = { mapID = 1434, x = 0.284, y = 0.758 },
+    items = {
+        [228175] = 15, [228176] = 15, [272393] = 100, [272394] = 100, [272395] = 100, [272396] = 100,
+        [272397] = 100, [272398] = 100, [272399] = 100, [272401] = 100, [272402] = 100, [272403] = 100,
+        [272404] = 100, [272405] = 100, [272406] = 75, [272407] = 75, [272408] = 75, [272409] = 75,
+        [272410] = 100, [272411] = 75, [272413] = 75, [272414] = 75, [272415] = 75, [272427] = 50,
+        [272428] = 50, [272429] = 50, [272430] = 50, [272431] = 50, [272432] = 50, [272433] = 50,
+        [272434] = 50, [272435] = 50, [272436] = 50, [272437] = 125, [272438] = 125, [272439] = 125,
+        [272440] = 125,
+    },
+}
+
+function Source.ReadVendor()
+    local v, list = Source.VENDOR, {}
+    for id, cost in pairs(v.items) do
+        list[#list + 1] = { item = id, instance = v.place, vendor = v.npc, cost = cost, currency = v.currency,
+            raid = false }
+    end
+    return list
+end
+
 -- AtlasLoot's world epics (Collections) and the list above: drops of no one boss, anywhere.
 function Source.ReadWorld(content)
     local list, seen = {}, {}
@@ -208,7 +233,7 @@ function Source.ReadCrafting(module, prof)
                         local made = ok and type(data) == "table" and data[1]
                         if type(made) == "number" and not seen[made] then
                             seen[made] = true
-                            list[#list + 1] = { item = made, instance = profName, craft = true, skill = data[3], prof = key,
+                            list[#list + 1] = { item = made, instance = profName, craft = true, skill = data[3], prof = key, profID = data[2],
                                 spellID = spellID, reagents = data[6], counts = data[7], raid = false }
                         end
                     end)
@@ -230,7 +255,7 @@ function Source.ReadJournal(fdj)
                     if type(r[1]) == "number" and (r[3] or 0) >= QUEST_QUALITY then
                         list[#list + 1] = { item = r[1], instance = key, quest = q.name or "?", questID = q.id,
                             giver = q.pickup, choice = q.rewardChoice == true, faction = q.faction,
-                            classOnly = q.classOnly, journal = key, raid = false }
+                            classOnly = q.classOnly, requires = q.requires, journal = key, raid = false }
                     end
                 end
             end
@@ -254,6 +279,12 @@ end
 -- x, y, label, detail } }, nil when the journal does not know it (raids).
 function Source.Place(drop)
     local fdj = journal()
+    if drop and drop.vendor then
+        local v, info = Source.VENDOR, C_Map.GetMapInfo(Source.VENDOR.entrance.mapID)
+        local e = v.entrance
+        return { name = v.place, location = info and info.name,
+            entrance = { mapID = e.mapID, x = e.x, y = e.y, label = v.npc } }
+    end
     if not (fdj and drop) or drop.world then return nil end
     local key = drop.journal or (journalByNpc and drop.npcID and journalByNpc[drop.npcID])
     if not key and fdj.DungeonFromInstanceName then
@@ -298,6 +329,7 @@ function Source.Load()
     if module then names[#names + 1] = "AtlasLoot Classic Forever" end
     for _, d in ipairs(crafting or {}) do list[#list + 1] = d end
     for _, d in ipairs(world or {}) do list[#list + 1] = d end
+    for _, d in ipairs(Source.ReadVendor()) do list[#list + 1] = d end
     if fdj then
         for _, d in ipairs(Source.ReadJournal(fdj)) do list[#list + 1] = d end
         names[#names + 1] = "DungeonJournal"

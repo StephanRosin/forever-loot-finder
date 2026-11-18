@@ -330,6 +330,7 @@ local function dropText(d)
     if d.quest then return ("%s · %s"):format(L.QUEST_NAME:format(d.quest), d.instance) end
     if d.craft then return L.CRAFT_NAME:format(d.instance, d.skill or 0) end
     if d.world then return L.WORLD_DROP end
+    if d.vendor then return ("%s · %s"):format(d.vendor, d.instance) end
     local where = ("%s · %s"):format(d.boss, d.instance)
     if d.rate then where = where .. (" · %s %%"):format(d.rate) end
     return where
@@ -703,7 +704,8 @@ local function build()
         return out
     end
     frame.sourceChips = chipsOf({ { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
-        { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" }, { "filterWorld", "FILTER_WORLD" } })
+        { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" }, { "filterWorld", "FILTER_WORLD" },
+        { "filterVendors", "FILTER_VENDORS" } })
     -- Inside a dungeon or raid: its name on the chip.
     local get, set = setting("filterHere")
     frame.hereChip = Chip(body, function() return L.FILTER_HERE:format((ns.Source.Here() or {}).name or "") end, get, set)
