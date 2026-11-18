@@ -217,17 +217,9 @@ function Filter.Run(o)
     local plain = global and setmetatable({ better = false }, { __index = o }) or o
     local wearLevel = o.now and o.level or nil
     local wanted = o.slot and Rules.SLOT[o.slot]
-    -- "Now": crafts only with the profession at the recipe's skill, quests only from their level and not handed in.
-    local ranks = {}
-    local function canCraft(d)
-        local line = Rules.SKILL_LINE[d.profID]
-        if not (line and C_SkillInfo) then return true end  -- a profession AtlasLoot does not number: kept
-        if ranks[line] == nil then
-            local info = C_SkillInfo.GetSkillLineInfoByID(line)
-            ranks[line] = info and info.rank or 0
-        end
-        return ranks[line] > 0 and ranks[line] >= (d.skill or 0)
-    end
+    -- "Now": quests only from their level and not handed in. Crafts stay without the profession (bought, still
+    -- worn); an item whose tooltip asks for a profession to be worn needs it.
+    local ranks = o.now and Items.Skills() or nil
     local function canQuest(d)
         return (d.requires or 0) <= o.level
             and not (d.questID and C_QuestLog.IsQuestFlaggedCompleted(d.questID))
@@ -248,7 +240,7 @@ function Filter.Run(o)
                 elseif d.vendor then
                     wanted = o.vendors
                 elseif d.craft then
-                    wanted = o.crafting and not (o.now and not canCraft(d))
+                    wanted = o.crafting
                 elseif d.quest then
                     wanted = o.quests and (not d.faction or d.faction == "Both" or d.faction == o.faction)
                         and (not d.classOnly or tostring(d.classOnly):upper() == o.class)
@@ -269,6 +261,7 @@ function Filter.Run(o)
             if keep then Items.Full(item) end
             keep = keep and not (not global and item.loaded and not Items.ForClass(item, o.class))
                 and not (not global and o.now and item.loaded and item.reqLevel > o.level)
+                and not (not global and o.now and item.loaded and not Items.SkillMet(item, ranks))
                 and not (text and not (item.name and item.name:lower():find(text, 1, true)))
             if keep then Items.Request(item) end
             -- Loaded, but neither stats nor an effect: the client does not know

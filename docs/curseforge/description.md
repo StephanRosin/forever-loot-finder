@@ -25,7 +25,7 @@ Install both, and keep AtlasLoot's Dungeons and Raids, Crafting and Collections 
 - Items limited to some classes ("Classes: Mage") are shown to those classes only.
 
 ## Filters
-- **Wearable now**: only items for your level and the armor types you have learned; crafts only with the profession at the recipe's skill, quest rewards only from the quest's level and not once handed in.
+- **Wearable now**: only items for your level and the armor types you have learned; items that need a profession to be worn ("Requires Tailoring (300)") only with it; quest rewards only from the quest's level and not once handed in.
 - **Best armor only**: body armor of your class's heaviest type only (mail or plate from level 40 on); cloaks, jewelry and trinkets always count. Not shown for cloth wearers.
 - **Dungeons**, **raids**, **quests**, **crafting** and **world drops**, each on or off. World drops are AtlasLoot's world epics and the blue and purple world drops Wowhead knows for Forever. Crafted items show the profession and the skill needed; the panel lists the reagents. Quest rewards (blue and better) show the quest instead of the boss; quests of the other faction or another class are left out.
 - **Only <dungeon>**: inside a dungeon or raid, a chip with its name shows only the loot of its bosses. With **Better than worn** on, that is the list of upgrades you can get here.

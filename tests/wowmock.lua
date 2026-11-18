@@ -320,11 +320,21 @@ AtlasLoot = {
 }
 M.atlas = module
 -- Crafting: a profession's recipes as spell ids; Profession data per spell.
-M.crafting = { Tailoring = { name = "Tailoring", items = { { name = "Robes", [1] = { { 1, 7001 }, { 2, 7002 } } } } } }
-M.professions = { [7001] = { 150, 8, 250, 260, 280, { 14047, 14341 }, { 6, 1 } } }
+M.crafting = { Tailoring = { name = "Tailoring", items = { { name = "Robes", [1] = { { 1, 7001 }, { 2, 7002 }, { 3, 7003 } } } } } }
+M.professions = { [7001] = { 150, 8, 250, 260, 280, { 14047, 14341 }, { 6, 1 } },
+    [7003] = { 151, 8, 300, 300, 300, { 14047 }, { 4 } } }
 -- The character's skill lines by id (rank), handed-in quests.
-M.skills, M.questsDone = { [197] = 300 }, {}
-C_SkillInfo = { GetSkillLineInfoByID = function(id) return M.skills[id] and { rank = M.skills[id] } or nil end }
+-- The character's skill lines by name -> rank, in the skills window's order (a header first).
+M.skills, M.questsDone = { Tailoring = 300 }, {}
+C_SkillInfo = {
+    GetNumSkillLines = function()
+        M.skillList = { { name = "Professions", isHeader = true } }
+        for name, rank in pairs(M.skills) do M.skillList[#M.skillList + 1] = { name = name, rank = rank } end
+        return #M.skillList
+    end,
+    GetSkillLineInfo = function(i) return M.skillList[i] end,
+}
+ITEM_MIN_SKILL = "Requires %s (%d)"
 C_QuestLog = C_QuestLog or {}
 C_QuestLog.IsQuestFlaggedCompleted = function(id) return M.questsDone[id] == true end
 AtlasLoot.Data.Profession = { GetProfessionData = function(id) return M.professions[id] end }

@@ -55,19 +55,39 @@ local function classesOf(text)
     return any and set or nil
 end
 
--- The tooltip's effect lines, the trigger cut off: { kind, text }; and the
--- classes it is limited to (nil: any).
+-- A "Requires Tailoring (300)" line -> "Tailoring", 300; nil without one. The pattern comes from the
+-- client's own string, so it reads every language; the line is red when not met, the colour is cut off.
+local skillPattern
+local function skillOf(text)
+    if not skillPattern then
+        local fmt = ITEM_MIN_SKILL or "Requires %s (%d)"
+        -- %s / %d (also "%1$s") to \1 / \2 first, then the rest escaped: a NUL would end a Lua 5.1 pattern.
+        skillPattern = "^" .. fmt:gsub("%%%d?%$?s", "\1"):gsub("%%%d?%$?d", "\2")
+            :gsub("[%(%)%.%+%-%*%?%[%]%^%$]", "%%%0"):gsub("\1", "(.-)"):gsub("\2", "(%%d+)") .. "$"
+    end
+    local name, rank = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):match(skillPattern)
+    if not name then return nil end
+    return name, tonumber(rank)
+end
+
+-- The tooltip's effect lines, the trigger cut off: { kind, text }; the
+-- classes it is limited to (nil: any); and the profession it needs to be worn
+-- ({ name, rank }, nil: none).
 local TRIGGERS = { { "USE", "ITEM_SPELL_TRIGGER_ONUSE", "Use:" }, { "EQUIP", "ITEM_SPELL_TRIGGER_ONEQUIP", "Equip:" },
     { "PROC", "ITEM_SPELL_TRIGGER_ONPROC", "Chance on hit:" } }
 local function effects(id)
     local get = C_TooltipInfo and C_TooltipInfo.GetItemByID
     local ok, data = false, nil
     if get then ok, data = pcall(get, id) end
-    local list, classes = {}, nil
+    local list, classes, skill = {}, nil, nil
     for _, line in ipairs(ok and data and data.lines or {}) do
         local text = line.leftText
         if type(text) == "string" then
             classes = classes or classesOf(text)
+            if not skill then
+                local name, rank = skillOf(text)
+                if name then skill = { name = name, rank = rank } end
+            end
             for _, t in ipairs(TRIGGERS) do
                 local prefix = _G[t[2]] or t[3]
                 if text:sub(1, #prefix) == prefix then
@@ -77,7 +97,7 @@ local function effects(id)
             end
         end
     end
-    return list, classes
+    return list, classes, skill
 end
 
 -- How long an asked-for item may take before it counts as "no data".
@@ -119,7 +139,7 @@ function Items.Full(item)
         if ns.Rules.HasStats(item.stats) then
             item.effects = {}
         else
-            item.effects, item.classes = effects(item.id)
+            item.effects, item.classes, item.skill = effects(item.id)
             item.classesRead = true
         end
         item.loaded = true
@@ -134,10 +154,28 @@ function Items.Get(id) return Items.Full(Items.Instant(id)) end
 function Items.ForClass(item, class)
     if not item.classesRead then
         local _
-        _, item.classes = effects(item.id)
+        _, item.classes, item.skill = effects(item.id)
         item.classesRead = true
     end
     return item.classes == nil or item.classes[class] == true
+end
+
+-- The character's professions by name -> rank (the names the tooltips use).
+function Items.Skills()
+    local ranks = {}
+    if not (C_SkillInfo and C_SkillInfo.GetNumSkillLines) then return ranks end
+    for i = 1, C_SkillInfo.GetNumSkillLines() do
+        local info = C_SkillInfo.GetSkillLineInfo(i)
+        if info and info.name and not info.isHeader then ranks[info.name] = info.rank or 0 end
+    end
+    return ranks
+end
+
+-- Whether the character may wear it as to professions ("Requires Tailoring (300)", Truefaith Vestments).
+-- Read with the classes (Items.ForClass first).
+function Items.SkillMet(item, ranks)
+    local need = item.skill
+    return need == nil or (ranks[need.name] or 0) >= need.rank
 end
 
 function Items.Request(item)

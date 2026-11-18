@@ -425,9 +425,6 @@ end
 
 -- Whether the class can wear it: at `level` (nil: at the top level) for the
 -- armour; weapons by what the class can learn.
--- AtlasLoot's profession numbers (AtlasLoot.Data.Profession's PROFESSION_NAME) as the client's skill lines.
-Rules.SKILL_LINE = { 129, 164, 165, 171, 182, 185, 186, 197, 202, 333, 356, 393, 40, 755, 773 }
-
 function Rules.CanWear(class, classID, subClassID, equipLoc, level)
     if classID == Rules.ARMOR then
         if equipLoc == "INVTYPE_CLOAK" or subClassID == 0 then return true end

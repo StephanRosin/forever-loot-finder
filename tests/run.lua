@@ -80,6 +80,9 @@ M.items[160] = item("Wandering Charm", 4, 63, 58, "INVTYPE_TRINKET", 4, 0, { [HE
 M.world = { items = { { name = "Trinkets", [1] = { { 1, 160 } } } } }
 M.items[170] = item("Vendor Ring", 3, 65, 52, "INVTYPE_FINGER", 4, 0, { [HEAL] = 14, ITEM_MOD_INTELLECT_SHORT = 8 })
 M.items[150] = item("Tailored Robe", 3, 58, 52, "INVTYPE_ROBE", 4, 1, { [HEAL] = 20, ITEM_MOD_INTELLECT_SHORT = 12 })
+-- 151: worn only with the profession (Truefaith Vestments: "Requires Tailoring (300)", red when not met).
+M.items[151] = item("Tailor's Own Robe", 4, 60, 55, "INVTYPE_ROBE", 4, 1, { [HEAL] = 25, ITEM_MOD_INTELLECT_SHORT = 14 },
+    { tip = { "|cffff2020Requires Tailoring (300)|r" } })
 M.items[14047] = item("Runecloth", 1, 50, 0, "", 7, 0, {})
 -- DungeonJournal: quest rewards, entrances, boss models.
 M.items[130] = item("Quest Robe", 3, 58, 52, "INVTYPE_ROBE", 4, 1, { [HEAL] = 18, ITEM_MOD_INTELLECT_SHORT = 10 })
@@ -149,7 +152,7 @@ check("Undermine vendor: Adaptive Combat Assistant 125", Source.VENDOR.items[272
 Source.VENDOR.items = { [170] = 75 }
 check("loads AtlasLoot's module", Source.Load(), true)
 check("module loaded on demand", M.addons.AtlasLootClassic_DungeonsAndRaids, true)
-check("headers skipped (with quest rewards, a craft and a vendor item)", #Source.Drops(), 32)
+check("headers skipped (with quest rewards, two crafts and a vendor item)", #Source.Drops(), 33)
 local twins
 for _, d in ipairs(Source.ByItem(110)) do if d.boss == "Twins" then twins = d end end
 check("several npc ids: the first", twins and twins.npcID, 3)
@@ -241,14 +244,16 @@ Settings.Set("filterWorld", true)
 check("profession and skill", Source.ByItem(150)[1].instance .. " " .. Source.ByItem(150)[1].skill, "Tailoring 250")
 check("a spell without data left out", #Source.Drops() > 0, true)
 check("crafted listed", ids(run({}))[150] ~= nil, true)
-M.skills[197] = 249
-check("now: skill below the recipe out", ids(run({}))[150], nil)
-M.skills[197] = nil
-check("now: profession not learned out", ids(run({}))[150], nil)
+M.skills.Tailoring = nil
+check("now: crafts kept without the profession (bought, still worn)", ids(run({}))[150] ~= nil, true)
+check("now: worn only with the profession, not learned: out", ids(run({}))[151], nil)
+M.skills.Tailoring = 299
+check("now: worn only with the profession, skill too low: out", ids(run({}))[151], nil)
 Settings.Set("filterNow", false)
-check("not now: crafts without the profession", ids(run({}))[150] ~= nil, true)
+check("not now: worn only with the profession shown", ids(run({}))[151] ~= nil, true)
 Settings.Set("filterNow", true)
-M.skills[197] = 300
+M.skills.Tailoring = 300
+check("now: worn only with the profession, skill met: in", ids(run({}))[151] ~= nil, true)
 Settings.Set("filterCrafting", false)
 check("crafting off", ids(run({}))[150], nil)
 Settings.Set("filterCrafting", true)
