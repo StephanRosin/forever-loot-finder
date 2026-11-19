@@ -588,7 +588,7 @@ check("themes switch", ns.Themes.Switch("PITWALL"), true)
 check("still shown under Pitwall", ns.Window.IsShown(), true)
 check("registered for the hub", _G.ForeverThemes ~= nil, true)
 -- HD: each theme on its base's part, every colour its own backdrop, untinted.
-check("HD offered after the others", table.concat(LibForeverThemes.SpecIds(ns.Themes.SPECS), " ", 13),
+check("HD offered after the others", table.concat(LibForeverThemes.SpecIds(ns.Themes.SPECS), " ", 13, 19),
     "WOOD_HD TECH_HD PARCHMENT_HD RUNESTONE_HD GLASS_HD COMIC_HD FROST_HD")
 check("glass HD: lighter fill to show the glass", ns.Themes.SPECS.GLASS_HD.art.alpha .. "/"
     .. ns.Themes.SPECS.GLASS.art.alpha, "60/90")
@@ -596,7 +596,68 @@ check("wood HD switches", ns.Themes.Switch("WOOD_HD"), true)
 check("wood HD: its own backdrop", ns.Themes.Back(ns.Themes.Art()), "WoodHDEbony")
 check("wood HD: untinted", table.concat(ns.Themes.Tint(ns.Themes.Art()), ",", 1, 3), "1,1,1")
 check("still shown under Wood HD", ns.Window.IsShown(), true)
+-- The framed themes (LibForeverThemes 10): a frame outside the rim, the title bar a banner.
+check("framed: offered after the others", table.concat(LibForeverThemes.MenuIds(
+    LibForeverThemes.SpecIds(ns.Themes.SPECS)), " ", 13, 14), "AZEROTH GOBLIN")
+for _, f in ipairs({ "Fonts/Alegreya-Regular.ttf", "Fonts/Bungee-Regular.ttf", "Fonts/Rubik-Medium.ttf",
+    "Themes/AzerothParchment.tga", "Themes/AzerothBanner.tga", "Themes/AzerothBannerEnd.tga",
+    "Themes/GoblinSoot.tga", "Themes/GoblinCopper.tga", "Themes/GoblinHazard.tga" }) do
+    local fh = io.open(ROOT .. "/Libs/LibForeverThemes/Media/" .. f, "rb")
+    check("framed: shipped " .. f, fh ~= nil, true)
+    if fh then fh:close() end
+end
+local function file(tex) return tex._texture and tex._texture:match("[^\\]+$") end
+local win = ns.Window.Frame()
+local bar = win.bar
+check("azeroth switches", ns.Themes.Switch("AZEROTH"), true)
+check("azeroth: light parchment", file(win.themeBack), "AzerothParchment")
+local framedSides = 0
+for _, strip in ipairs(win.frameStrips) do
+    if strip:IsShown() and file(strip) == "WoodHDWalnut" then framedSides = framedSides + 1 end
+end
+check("azeroth: walnut frame on four sides", framedSides, 4)
+local top = win.frameStrips[1]._points.TOPLEFT
+check("azeroth: frame outside the rim", top[3] < 0 and top[4] > 0, true)
+check("azeroth: title bar a banner", bar.fill:IsShown() and file(bar.fill), "AzerothBanner")
+check("azeroth: banner ends, the right one mirrored", bar.ends[1]:IsShown() and bar.ends[2]._texCoord[1], 1)
+check("azeroth: title past the banner's end", select(4, win.title:GetPoint("LEFT")), 16)
+local function rgb(fs) return table.concat({ fs._textColor[1], fs._textColor[2], fs._textColor[3] }, "/") end
+check("azeroth: title in the banner's gold", rgb(win.title), "1/0.82/0")
+check("azeroth: tab on the banner light, not ink", win.tabs.shop.text._textColor[1] > 0.9, true)
+check("azeroth: body text in dark ink", win.footer._textColor[1] < 0.3, true)
+local amber = ns.Themes.Ink({ 1, 0.82, 0.2 })
+check("azeroth: yellow in dark amber, not olive", amber[1] > amber[2] and amber[1] < 0.6, true)
+check("azeroth: grey darkened", ns.Themes.Ink({ 0.62, 0.62, 0.62 })[1] < 0.45, true)
+check("azeroth: dark already: as it is", table.concat(ns.Themes.Ink({ 0.1, 0.2, 0.1 }), "/"), "0.1/0.2/0.1")
+check("azeroth: hex inked like the colour", ns.Themes.InkHex("ff9d9d9d") ~= "ff9d9d9d"
+    and ns.Themes.InkHex("ff9d9d9d"):sub(1, 2), "ff")
+check("azeroth: coins in ink", Prices.Money(10000):find("ffd700", 1, true), nil)
+check("goblin switches", ns.Themes.Switch("GOBLIN"), true)
+check("goblin: copper frame", win.frameStrips[1]:IsShown() and file(win.frameStrips[1]), "GoblinCopper")
+check("goblin: hazard only a 5 px strip, repeating", file(bar.fill) .. " " .. bar.fill:GetHeight() .. " "
+    .. tostring(bar.fill:GetHorizTile()), "GoblinHazard 5 true")
+check("goblin: no banner ends", bar.ends[1]:IsShown(), false)
+check("goblin: title as the theme's text", win.title._textColor[1], 0.96)
+check("goblin: colours as they are", table.concat(ns.Themes.Ink({ 1, 1, 0 }), "/"), "1/1/0")
+-- Bungee refused on first use: Friz meanwhile, then styled (and measured) once more.
+local bungee = ns.Media.FontPath("Bungee")
+local setFont, refusedOnce = win.title.SetFont, false
+win.title.SetFont = function(self, path, ...)
+    if path == bungee and not refusedOnce then refusedOnce = true; return false end
+    return setFont(self, path, ...)
+end
+ns.Themes.Switch("CLASSIC"); M.RunTimers()
+ns.Themes.Switch("GOBLIN")
+check("goblin font refused: Friz meanwhile", (win.title:GetFont()), ns.Media.FontPath("Friz Quadrata"))
+M.RunTimers()
+check("goblin font refused: taken a moment later", (win.title:GetFont()), bungee)
+win.title.SetFont = setFont
+ns.Themes.Switch("PITWALL")
+check("pitwall after them: no frame, no ends", win.frameStrips[1]:IsShown() or bar.ends[1]:IsShown(), false)
+check("pitwall after them: the strip a colour again", bar.fill:GetHorizTile() == false and bar.fill._texColor ~= nil, true)
+check("pitwall after them: coins as they were", Prices.Money(10000), "1|cffffd700g|r")
 ns.Themes.Switch("CLASSIC")
+check("classic after them: no frame", win.frameStrips[1]:IsShown(), false)
 ns.Options.Open()
 check("options open", ns.Options.IsShown(), true)
 ns.Options.ShowPage("character")

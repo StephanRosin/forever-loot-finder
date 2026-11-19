@@ -21,6 +21,13 @@ local function look(text, bg, alpha, outline, rimSize)
     return { text = text, bg = bg, alpha = alpha, outline = outline or "OUTLINE", rimSize = rimSize or 1 }
 end
 
+-- A framed theme's part: its accent (the library gives it none) and, on a
+-- light paper, ink = coloured values darkened (Themes.Ink).
+local function framed(art, accent, ink)
+    art.accent, art.ink = accent, ink
+    return art
+end
+
 Themes.SPECS = Lib.Specs({
     WOOD = { art = look({ 0.96, 0.88, 0.70 }, { 0.1, 0.06, 0.02 }, 0, nil, 2) },
     TECH = { art = look({ 0.80, 0.97, 1 }, { 0.02, 0.05, 0.08 }, 0) },
@@ -35,6 +42,11 @@ Themes.SPECS = Lib.Specs({
     CONSOLE = { font = "IBM Plex Mono", bodyFont = false, art = look({ 0.9, 0.91, 0.93 }, { 0.06, 0.06, 0.07 }, 0) },
     PITWALL = { font = "Titillium Web SemiBold", bodyFont = false,
         art = look({ 0.95, 0.95, 0.96 }, { 0.039, 0.039, 0.039 }, 100) },
+    -- The game's own world: dark ink without an outline on light parchment, the
+    -- title on a red banner (Themes.Banner); the accent a dark bronze, not red.
+    AZEROTH = { art = framed(look({ 0.2, 0.12, 0.05 }, { 0, 0, 0 }, 0, "", 2), { 0.45, 0.27, 0.07 }, true) },
+    -- A goblin workshop: sooty sheet metal, warning stripes along the top.
+    GOBLIN = { art = framed(look({ 0.96, 0.92, 0.85 }, { 0, 0, 0 }, 0, nil, 2), { 0.95, 0.76, 0.19 }) },
 }, true) -- the HD themes too, each from its base theme's part here
 -- Glass HD is there to show its glass: the dark fill over it at 60 % (Glass: 90 %).
 Themes.SPECS.GLASS_HD.art.alpha = 60
@@ -68,9 +80,53 @@ function Themes.Tint(art) return Lib.Tint(art, Themes.Current(), Themes.Color())
 function Themes.Rim(art) return Lib.Rim(Themes.Current(), Themes.Color()) or art.rim end
 function Themes.WedgeColor(art) return Lib.WedgeColor(art, Themes.Current(), Themes.Color()) end
 
--- The accent: the colour's, else the options' blue (Classic).
+-- The accent: the colour's, else the theme's own, else the options' blue (Classic).
 function Themes.Accent()
-    return Lib.Accent(Themes.Current(), Themes.Color()) or ns.Style.COLORS.accent
+    local art = Themes.Art()
+    return Lib.Accent(Themes.Current(), Themes.Color()) or art and art.accent or ns.Style.COLORS.accent
+end
+
+-- Whether the title bars are a banner (Azeroth's red): what stands on it is
+-- in BANNER_INK, never in the window's dark ink.
+function Themes.Banner()
+    local art = Themes.Art()
+    return art ~= nil and art.banner ~= nil and art.bannerEnd ~= nil
+end
+
+-- On the banner: titles and the on state in the gold of the Quest Log's
+-- header, the rest light (its header count's colour).
+Themes.BANNER_GOLD, Themes.BANNER_INK = { 1, 0.82, 0 }, { 0.96, 0.89, 0.72 }
+
+-- Dark ink for a coloured value { r, g, b } (item quality, class, verdict) on
+-- a light paper: luminance at most INK_LUMINANCE, about 3:1 on Azeroth's
+-- parchment. Plain darkening turns yellow olive, so it goes amber first.
+-- Elsewhere as it is.
+local INK_LUMINANCE, AMBER = 0.13, 0.68
+local function luminance(r, g, b)
+    local function lin(v) return v <= 0.04045 and v / 12.92 or ((v + 0.055) / 1.055) ^ 2.4 end
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+end
+
+function Themes.Ink(c)
+    local art = Themes.Art()
+    if not (art and art.ink) then return c end
+    local r, g, b = c[1], c[2], c[3]
+    if r > 0.8 and g > 0.8 and b < 0.3 then g = r * AMBER end
+    local lum = luminance(r, g, b)
+    if lum <= INK_LUMINANCE then return { r, g, b, c[4] } end
+    local k = (INK_LUMINANCE / lum) ^ (1 / 2.2)
+    return { r * k, g * k, b * k, c[4] }
+end
+
+-- The same for a colour code's hex ("ffrrggbb", as in |c...|r).
+function Themes.InkHex(hex)
+    local art = Themes.Art()
+    if not (art and art.ink) then return hex end
+    local c = { tonumber(hex:sub(-6, -5), 16) / 255, tonumber(hex:sub(-4, -3), 16) / 255,
+        tonumber(hex:sub(-2), 16) / 255 }
+    c = Themes.Ink(c)
+    local function byte(v) return math.floor(v * 255 + 0.5) end
+    return ("ff%02x%02x%02x"):format(byte(c[1]), byte(c[2]), byte(c[3]))
 end
 
 -- Fonts: the display face for headings, the body face for the rest (the

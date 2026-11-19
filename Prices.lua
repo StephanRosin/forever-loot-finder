@@ -68,13 +68,15 @@ function Prices.Read()
 end
 
 -- 12g 5s: no copper (it only widens the table), except under a silver.
+-- The coins' colours in the window's ink (dark on a light paper).
 function Prices.Money(copper)
     copper = math.floor(copper + 0.5)
     local g, s, c = math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100
+    local ink = ns.Themes.InkHex
     local parts = {}
-    if g > 0 then parts[#parts + 1] = g .. "|cffffd700g|r" end
-    if s > 0 then parts[#parts + 1] = s .. "|cffc7c7cfs|r" end
-    if #parts == 0 then parts[#parts + 1] = c .. "|cffeda55fc|r" end
+    if g > 0 then parts[#parts + 1] = g .. "|c" .. ink("ffffd700") .. "g|r" end
+    if s > 0 then parts[#parts + 1] = s .. "|c" .. ink("ffc7c7cf") .. "s|r" end
+    if #parts == 0 then parts[#parts + 1] = c .. "|c" .. ink("ffeda55f") .. "c|r" end
     return table.concat(parts, " ")
 end
 
