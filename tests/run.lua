@@ -611,6 +611,32 @@ local sliders = 0
 for _, row in ipairs(page.rows) do if row.slider then sliders = sliders + 1 end end
 check("weights page: the role's stats only (priest healer: 7)", sliders, 7)
 Settings.Set("advanced", false)
+-- HD themes are colours of their base: not in the theme menu.
+ns.Themes.Switch("TECH")
+ns.Options.ShowPage("general")
+_G.ForeverLootFinderPagegeneral.relayout()
+local function optionRow(label)
+    for _, row in ipairs(_G.ForeverLootFinderPagegeneral.rows) do
+        if row.opts and row.opts.label == ns.L[label] then return row end
+    end
+end
+local themeOpt, colourOpt = optionRow("OPT_THEME_CHOICE").opts, optionRow("OPT_THEME_COLOR").opts
+local themeValues = {}
+for _, item in ipairs(themeOpt.items()) do themeValues[#themeValues + 1] = item.value end
+check("theme menu: no HD", table.concat(themeValues, " "):find("_HD") == nil, true)
+local colours = colourOpt.items()
+check("colour menu: tech's own, then HD", #colours .. " " .. colours[1].text .. " / " .. colours[#colours].text,
+    #LibForeverThemes.Colors("TECH") + #LibForeverThemes.Colors("TECH_HD") .. " " .. ns.L.THEME_COLOR_TECH_CYAN
+    .. " / HD " .. ns.L["THEME_COLOR_TECH_HD_" .. LibForeverThemes.Colors("TECH_HD")[#LibForeverThemes.Colors("TECH_HD")]])
+colourOpt.set("TECH_HD:CARBON")
+check("HD colour: switches to the HD theme", ns.Themes.Current() .. " " .. ns.Themes.Color(), "TECH_HD CARBON")
+check("HD colour: menus show base and HD entry", themeOpt.get() .. " " .. colourOpt.get(), "TECH TECH_HD:CARBON")
+themeOpt.set("TECH")
+check("theme menu: its base chosen again keeps HD", ns.Themes.Current(), "TECH_HD")
+colourOpt.set("TECH:GREEN")
+check("plain colour: back to the base", ns.Themes.Current() .. " " .. ns.Themes.Color(), "TECH GREEN")
+ns.Themes.SetColor("CYAN", "TECH")
+ns.Themes.Switch("CLASSIC")
 
 section("Languages")
 local en, de = ns.Locales.enUS, ns.Locales.deDE
