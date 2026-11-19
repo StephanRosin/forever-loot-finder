@@ -216,8 +216,7 @@ end
 function Panel.RecipeText(spellID, made)
     if not spellID then return nil end
     if C_SpellBook and C_SpellBook.IsSpellKnown and C_SpellBook.IsSpellKnown(spellID) then
-        return "|TInterface\\Buttons\\UI-CheckBox-Check:16:16:0:-1|t |c" .. ns.Themes.InkHex("ff33dd33")
-            .. L.RECIPE_KNOWN .. "|r"
+        return "|TInterface\\Buttons\\UI-CheckBox-Check:16:16:0:-1|t |cff33dd33" .. L.RECIPE_KNOWN .. "|r"
     end
     local data = AtlasLoot and AtlasLoot.Data and AtlasLoot.Data.Recipe
     if not data then return nil end

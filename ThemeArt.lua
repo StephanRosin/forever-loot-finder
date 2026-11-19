@@ -21,7 +21,6 @@ function ThemeArt.BuildWindow(frame, titleBar)
     for i = 1, 4 do frame.rims[i] = frame:CreateTexture(nil, "BORDER", nil, 1) end
     frame.frameStrips = {}
     for i = 1, 4 do frame.frameStrips[i] = frame:CreateTexture(nil, "BORDER", nil, 2) end
-    titleBar.isBar = true
     titleBar.fill = titleBar:CreateTexture(nil, "BACKGROUND")
     titleBar.fill:SetAllPoints(titleBar)
     titleBar.ends = {}
@@ -147,22 +146,13 @@ function ThemeArt.WindowRim()
     return art and art.rimSize or 1
 end
 
--- A shade alpha strong under rows and fields: black, but on a light paper
--- (Azeroth) a faint brown, so the dark ink on it still reads.
-local PAPER_SHADE, PAPER_ALPHA = { 0.36, 0.22, 0.08 }, 0.5
-function ThemeArt.Shade(alpha)
-    local art = ns.Themes.Art()
-    if art and art.ink then return { PAPER_SHADE[1], PAPER_SHADE[2], PAPER_SHADE[3], alpha * PAPER_ALPHA } end
-    return { 0, 0, 0, alpha }
-end
-
 -- Cards (rows, chips): the options' panel under Classic; dark on Swiss and
 -- Pitwall's black; a light shade elsewhere.
-local CARD_SOLID = { 0, 0, 0, 0.85 }
+local CARD_SOLID, CARD_SHADE = { 0, 0, 0, 0.85 }, { 0, 0, 0, 0.3 }
 function ThemeArt.CardColour()
     local art = ns.Themes.Art()
     if not art then return ns.Style.COLORS.panel end
-    return art.strip and CARD_SOLID or ThemeArt.Shade(0.3)
+    return art.strip and CARD_SOLID or CARD_SHADE
 end
 
 function ThemeArt.StyleWindow(frame, titleBar)

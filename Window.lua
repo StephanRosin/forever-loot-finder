@@ -43,27 +43,15 @@ local texts = {}   -- every font string: { fs, size, kind } (restyled with the t
 -- ---------------------------------------------------------------------------
 -- Look
 -- ---------------------------------------------------------------------------
--- onBar: on a title bar that is a banner (Azeroth), titles and accents in
--- its gold, the rest light; never the window's dark ink on its red.
-local function colour(kind, onBar)
-    if onBar and ns.Themes.Banner() then
-        local T = ns.Themes
-        if kind == "title" or kind == "accent" then return T.BANNER_GOLD end
-        local c = T.BANNER_INK
-        return kind == "muted" and { c[1], c[2], c[3], 0.75 } or c
-    end
+local function colour(kind)
     if kind == "accent" then return ns.Themes.Accent() end
     local c = ns.Themes.TextColor()
     if kind == "muted" then return { c[1], c[2], c[3], 0.62 } end
     return c
 end
 
--- A coloured value (quality, class, verdict) in the window's body: in dark
--- ink on a light paper (Themes.Ink). Not in the class menu: that is dark.
-local function ink(c) return ns.Themes.Ink(c) end
-
 local function paintText(fs, kind, c)
-    c = c or colour(kind, fs.onBar)
+    c = c or colour(kind)
     fs:SetTextColor(c[1], c[2], c[3], c[4] or 1)
 end
 
@@ -89,17 +77,13 @@ local function styleText(t)
         t.fs:SetFont(ns.Media.FontPath("Friz Quadrata"), t.size, ns.Themes.Outline())
         fontRefused()
     end
-    -- A drop shadow under text without an outline, but not under ink on a light paper (it smudges).
-    local art = ns.Themes.Art()
-    local shadow = ns.Themes.Outline() == "" and not (art and art.ink)
-    t.fs:SetShadowOffset(shadow and 1 or 0, shadow and -1 or 0)
+    t.fs:SetShadowOffset(ns.Themes.Outline() == "" and 1 or 0, ns.Themes.Outline() == "" and -1 or 0)
     if t.paint ~= false then paintText(t.fs, t.kind) end
 end
 
 -- kind: text, muted, accent, title; paint false: the caller colours it.
 local function Text(parent, size, kind, paint)
     local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs.onBar = parent.isBar or parent.onBar
     local t = { fs = fs, size = size, kind = kind or "text", paint = paint }
     texts[#texts + 1] = t
     styleText(t)
@@ -139,16 +123,15 @@ local chips = {}
 
 local function paintChip(chip)
     local on = chip.get()
-    local a = colour("accent", chip.onBar)
+    local a = colour("accent")
     chip.fill:SetVertexColor(a[1], a[2], a[3], on and 0.2 or 0)
-    paintEdges(chip.edges, on and a or colour("muted", chip.onBar), on and 0.9 or 0.45)
+    paintEdges(chip.edges, on and a or colour("muted"), on and 0.9 or 0.45)
     paintText(chip.text, on and "text" or "muted")
     chip.tick:SetShown(on and not chip.dot)
 end
 
 local function Chip(parent, label, get, set, opts)
     local chip = CreateFrame("Button", nil, parent)
-    chip.onBar = parent.isBar
     chip:SetHeight(CHIP_H)
     chip.fill = fill(chip, "BACKGROUND")
     chip.fill:SetAllPoints()
@@ -513,7 +496,7 @@ local function fillRow(row, entry, open)
     row.icon:SetTexture(item.icon)
     paintEdges(row.iconEdges, q, 1)
     row.name:SetText(item.name or (Items.NoData(item) and L.ITEM_ID:format(item.id)) or L.LOADING)
-    paintText(row.name, nil, item.loaded and ink(q) or colour("muted"))
+    paintText(row.name, nil, item.loaded and q or colour("muted"))
     local d = entry.drops[1]
     local more = #entry.drops > 1 and ("  (+%d)"):format(#entry.drops - 1) or ""
     row.where:SetText(dropText(d) .. more .. (d.forever and ("  " .. L.NEW_MARK) or ""))
@@ -524,13 +507,13 @@ local function fillRow(row, entry, open)
     if entry.hit then marks[#marks + 1] = L.HIT_MARK:format(entry.hit) end
     row.badges:SetText(table.concat(marks, " · "))
     row.value:SetPoint("RIGHT", row, "TOPRIGHT", -COL.value, -ROW_H / 2 + (#marks > 0 and 7 or 0))
-    paintText(row.badges, nil, ink(UP_COLOR))
+    paintText(row.badges, nil, UP_COLOR)
     row.value:SetText(statText(entry))
     paintText(row.value, entry.unclear and "muted" or "text")
     if entry.verdict then
         local up = entry.verdict == "UPGRADE"
         row.verdict:SetText(up and L.UPGRADE or L.ALTERNATIVE)
-        paintText(row.verdict, nil, ink(up and UP_COLOR or ALT_COLOR))
+        paintText(row.verdict, nil, up and UP_COLOR or ALT_COLOR)
     else
         row.verdict:SetText("")
     end
@@ -539,7 +522,7 @@ local function fillRow(row, entry, open)
     if entry.points and wornShown() and entry.delta then
         local d = math.floor(entry.delta + 0.5)
         row.points:SetText(("%+d"):format(d))
-        paintText(row.points, nil, d > 0 and ink(UP_COLOR) or colour("muted"))
+        paintText(row.points, nil, d > 0 and UP_COLOR or colour("muted"))
     else
         row.points:SetText(entry.points and tostring(math.floor(entry.points + 0.5)) or "")
         paintText(row.points, "text")
@@ -561,7 +544,6 @@ end
 -- ---------------------------------------------------------------------------
 local function closeButton(bar, onClick)
     local b = CreateFrame("Button", nil, bar)
-    b.onBar = bar.isBar
     b:SetSize(TITLE_H, TITLE_H)
     b:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
     b.text = Text(b, 16, "muted")
@@ -814,7 +796,7 @@ function Window.Relayout()
     if not frame then return end
     local class = currentClass()
     frame.classChip:Relabel()
-    paintText(frame.classChip.text, nil, ink(classColor(class)))
+    paintText(frame.classChip.text, nil, classColor(class))
     local classRoles = {}
     for _, role in ipairs(Rules.CLASS_ROLES[class] or {}) do classRoles[role] = true end
     local row1 = { frame.classChip }
@@ -862,7 +844,7 @@ local function paintWorn()
     w.name:SetText(item and (item.name or "…") or L.EMPTY_SLOT)
     if #list > 1 and list[2].name then w.name:SetText((item.name or "…") .. "  ·  " .. list[2].name) end
     local q = item and item.quality and QUALITY[item.quality]
-    paintText(w.name, q and nil or "muted", q and ink(q))
+    paintText(w.name, q and nil or "muted", q)
     w.ilvl:SetText(item and item.ilvl and tostring(item.ilvl) or "")
     -- Its points for the best of the picked roles: what the list's differences start from.
     local best
@@ -873,7 +855,7 @@ local function paintWorn()
         end
     end
     w.points:SetText(best and tostring(math.floor(best + 0.5)) or "")
-    w.back:SetVertexColor(unpack(ns.ThemeArt.Shade(0.25)))
+    w.back:SetVertexColor(0, 0, 0, 0.25)
     paintEdges(w.edges, colour("muted"), 0.35)
 end
 
@@ -926,7 +908,7 @@ function Window.Update()
     local started = ns.perf and debugprofilestop()
     for _, chip in ipairs(chips) do paintChip(chip) end
     frame.classChip.fill:SetVertexColor(0, 0, 0, 0)
-    paintText(frame.classChip.text, nil, ink(classColor(currentClass())))
+    paintText(frame.classChip.text, nil, classColor(currentClass()))
     frame.tabs.shop:Relabel()
     if state.tab == "shop" then
         ns.ShoppingUI.Refresh()
@@ -996,7 +978,6 @@ function Window.Restyle()
     frame.title:ClearAllPoints()
     frame.title:SetPoint("LEFT", frame.bar, "LEFT", ns.ThemeArt.TextStart(TITLE_H) or PAD, 0)
     paintEdges(frame.search.edges, colour("muted"), 0.45)
-    frame.search.back:SetVertexColor(unpack(ns.ThemeArt.Shade(0.45)))
     paintEdges(frame.classMenu.edges, colour("accent"), 0.8)
     for _, chip in ipairs(chips) do chip:Relabel() end
     frame.search.hint:SetText(L.SEARCH)

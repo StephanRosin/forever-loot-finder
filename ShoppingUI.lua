@@ -24,7 +24,6 @@ local SORT_ICON = "Interface\\AddOns\\ForeverLootFinder\\Media\\IconSort"
 local GRIP_TEXTURE = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local DONE_COLOUR = { 0.3, 0.9, 0.4 }
 local QUALITY = { [0] = "ff9d9d9d", "ffffffff", "ff1eff00", "ff0070dd", "ffa335ee", "ffff8000" }
-local GREY = "ff999999"
 
 local panel, note, dialog
 
@@ -42,11 +41,10 @@ end
 
 -- Rows ------------------------------------------------------------------------
 
--- In the window's ink (dark on a light paper), except in a tooltip (asIs).
-local function nameText(line, asIs)
-    local ink = asIs and function(hex) return hex end or ns.Themes.InkHex
-    local text = ("|c%s%s|r"):format(ink(QUALITY[line.quality or 1] or QUALITY[1]), line.name)
-    if line.origin then text = text .. ("  |c%s(%s)|r"):format(ink(GREY), line.origin) end
+local function nameText(line)
+    local colour = QUALITY[line.quality or 1] or QUALITY[1]
+    local text = ("|c%s%s|r"):format(colour, line.name)
+    if line.origin then text = text .. ("  |cff999999(%s)|r"):format(line.origin) end
     return text
 end
 
@@ -122,13 +120,12 @@ local function fillRow(row, entry)
     row.name:SetAlpha(line.done and 0.55 or 1)
     row.count:SetText(("%d/%d"):format(line.have, line.goal))
     if line.done then
-        local c = ns.Themes.Ink(DONE_COLOUR)
-        row.count:SetTextColor(c[1], c[2], c[3])
+        row.count:SetTextColor(DONE_COLOUR[1], DONE_COLOUR[2], DONE_COLOUR[3])
     else
         U.paintText(row.count, "text")
     end
     row.check:SetShown(line.done)
-    row.back:SetVertexColor(unpack(ns.ThemeArt.Shade(0.25)))
+    row.back:SetVertexColor(0, 0, 0, 0.25)
     U.paintEdges(row.edges, U.colour("accent"), line.here and not line.done and 0.95 or 0)
 end
 
@@ -241,7 +238,7 @@ local function suggest()
             b.icon:SetTexture(ns.Items.Get(r.id).icon)
             local listed = Shopping.Has(r.id)
             b.text:SetText(nameText({ name = r.name, quality = r.quality,
-                origin = Shopping.Origin(r.id) }) .. (listed and ("  |c%s– %s|r"):format(ns.Themes.InkHex(GREY), L.SHOP_LISTED) or ""))
+                origin = Shopping.Origin(r.id) }) .. (listed and ("  |cff999999– %s|r"):format(L.SHOP_LISTED) or ""))
             b:SetAlpha(listed and 0.55 or 1)
         end
         b:SetShown(r ~= nil)
@@ -431,7 +428,6 @@ end
 local function titleButton(parent, label, tip, onClick)
     local U = ui()
     local b = CreateFrame("Button", nil, parent)
-    b.onBar = parent.isBar
     b:SetSize(NOTE_TITLE - 6, NOTE_TITLE - 6)
     b.text = U.Text(b, 15, "muted")
     b.text:SetPoint("CENTER")
@@ -492,7 +488,7 @@ local function buildNote()
     note.sort.icon:SetPoint("CENTER")
     note.sort.icon:SetTexture(SORT_ICON)
     local function tint(kind)
-        local c = ui().colour(kind, note.sort.onBar)
+        local c = ui().colour(kind)
         note.sort.icon:SetVertexColor(c[1], c[2], c[3], c[4] or 1)
     end
     tint("muted")
@@ -575,10 +571,6 @@ function ShoppingUI.Restyle()
     if dialog then
         ns.ThemeArt.StyleWindow(dialog, dialog.bar)
         U.paintEdges(dialog.search.edges, U.colour("muted"), 0.45)
-        dialog.search.back:SetVertexColor(unpack(ns.ThemeArt.Shade(0.45)))
-        -- ChatFontNormal's white, but in the dark ink on a light paper.
-        local art = ns.Themes.Art()
-        U.paintText(dialog.search, nil, art and art.ink and U.colour("text") or { 1, 1, 1 })
     end
     ShoppingUI.Refresh()
 end
@@ -601,7 +593,7 @@ local function bossTooltip(tooltip, info)
     if #lines == 0 then return end
     tooltip:AddLine(L.SHOP_TOOLTIP, 1, 0.82, 0)
     for _, line in ipairs(lines) do
-        tooltip:AddDoubleLine("  " .. nameText({ name = line.name, quality = line.quality }, true),
+        tooltip:AddDoubleLine("  " .. nameText({ name = line.name, quality = line.quality }),
             ("%d/%d"):format(line.have, line.goal), 1, 1, 1, 1, 1, 1)
     end
 end
