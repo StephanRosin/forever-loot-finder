@@ -141,6 +141,32 @@ function Shopping.DropsHere(id)
     return false
 end
 
+-- The creature's id from its GUID ("Creature-0-…-<npcID>-<spawn>"); nil for
+-- players, pets of players and GUIDs Forever keeps secret.
+function Shopping.NpcID(guid)
+    if type(guid) ~= "string" or (issecretvalue and issecretvalue(guid)) then return nil end
+    local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)%-")
+    if kind ~= "Creature" and kind ~= "Vehicle" then return nil end
+    return tonumber(id)
+end
+
+-- The listed items this boss drops that are not there yet, as rows (Line).
+-- shortcut: AtlasLoot's first id stands for bosses of several creatures (Twin Emperors), the others show nothing; add all ids in Source when asked.
+function Shopping.ForBoss(npcID)
+    local lines = {}
+    if not npcID then return lines end
+    for _, e in ipairs(data().entries) do
+        for _, d in ipairs(ns.Source.ByItem(e.itemID)) do
+            if d.npcID == npcID then
+                local line = Shopping.Line(e)
+                if not line.done then lines[#lines + 1] = line end
+                break
+            end
+        end
+    end
+    return lines
+end
+
 -- What a row shows: name and quality from the finder's item cache (asked for
 -- once, kept once loaded), icon, origin, how many are in the bags and whether
 -- that is enough.

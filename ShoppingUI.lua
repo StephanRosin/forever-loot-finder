@@ -577,6 +577,31 @@ end
 
 Shopping.OnChange(ShoppingUI.Refresh)
 
+-- A boss's tooltip: what it drops from the list, "Name 0/3" like a quest
+-- objective. The loot tables are loaded once on the first boss hovered out of combat.
+local loadTried
+local function bossTooltip(tooltip, info)
+    if tooltip ~= GameTooltip or #Shopping.Entries() == 0 then return end
+    if not ns.Source.Ready() then
+        if not loadTried and not InCombatLockdown() then
+            loadTried = true
+            ns.Source.LoadAsync(function() end)
+        end
+        return
+    end
+    local lines = Shopping.ForBoss(Shopping.NpcID(info and info.guid))
+    if #lines == 0 then return end
+    tooltip:AddLine(L.SHOP_TOOLTIP, 1, 0.82, 0)
+    for _, line in ipairs(lines) do
+        tooltip:AddDoubleLine("  " .. nameText({ name = line.name, quality = line.quality }),
+            ("%d/%d"):format(line.have, line.goal), 1, 1, 1, 1, 1, 1)
+    end
+end
+ShoppingUI.BossTooltip = bossTooltip   -- the tests
+if TooltipDataProcessor and Enum.TooltipDataType then
+    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, bossTooltip)
+end
+
 -- The note as it was left, from login on.
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")

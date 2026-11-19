@@ -913,6 +913,20 @@ do
     ring.classID = 9
     check("shopping: no patterns", #Shop.Search("spell ring"), 0)
     ring.classID = class
+    -- A boss's tooltip names what it drops from the list.
+    check("boss: npc id from the GUID", Shop.NpcID("Creature-0-1-36-2-1-000ABC"), 1)
+    check("boss: players are no boss", Shop.NpcID("Player-1-0ABC"), nil)
+    issecretvalue = function() return true end
+    check("boss: a secret GUID is skipped", Shop.NpcID("Creature-0-1-36-2-1-000ABC"), nil)
+    issecretvalue = nil
+    check("boss: its item, still missing", #Shop.ForBoss(1), 1)
+    check("boss: another boss has none", #Shop.ForBoss(2), 0)
+    GameTooltip._lines = nil
+    ns.ShoppingUI.BossTooltip(GameTooltip, { guid = "Creature-0-1-36-2-1-000ABC" })
+    check("boss: tooltip shows 0/3", (GameTooltip._lines or {})[2] and GameTooltip._lines[2]:match("|(%d+/%d+)$"), "0/3")
+    M.state.bags = { [102] = 3 }
+    check("boss: enough in the bags, not shown", #Shop.ForBoss(1), 0)
+    M.state.bags = nil
     -- Sorting: custom (moved by hand), by origin, by slot.
     Shop.Add(103)
     Shop.Add(101)
