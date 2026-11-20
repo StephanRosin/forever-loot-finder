@@ -628,6 +628,20 @@ ns.Themes.Switch("GOBLIN")
 check("goblin font refused: Friz meanwhile", (win.title:GetFont()), ns.Media.FontPath("Friz Quadrata"))
 M.RunTimers()
 check("goblin font refused: taken a moment later", (win.title:GetFont()), bungee)
+-- SetFont says yes but the text did not take it (GetFont): tried again until it did, then drawn anew.
+local ignored, texts = 0, {}
+win.title.SetFont = function(self, path, ...)
+    if path == bungee and ignored < 3 then ignored = ignored + 1; return true end
+    return setFont(self, path, ...)
+end
+local setText = win.title.SetText
+win.title.SetText = function(self, t) texts[#texts + 1] = t; return setText(self, t) end
+ns.Themes.Switch("CLASSIC"); M.RunTimers()
+ns.Themes.Switch("GOBLIN")
+for _ = 1, 6 do M.RunTimers() end
+check("goblin font not taken: retried until it is", (win.title:GetFont()), bungee)
+check("goblin font not taken: text drawn anew", table.concat(texts, "|"):find("^.*||") ~= nil, true)
+win.title.SetText = setText
 win.title.SetFont = setFont
 ns.Themes.Switch("PITWALL")
 check("pitwall after them: no frame, no ends", win.frameStrips[1]:IsShown() or bar.ends[1]:IsShown(), false)

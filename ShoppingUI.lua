@@ -521,7 +521,6 @@ local function buildNote()
         ShoppingUI.Refresh()
     end)
     note:SetScript("OnSizeChanged", function() if note:IsShown() then ShoppingUI.Refresh() end end)
-    ShoppingUI.Restyle()
 end
 
 local function refreshNote()
@@ -544,9 +543,12 @@ function ShoppingUI.ShowNote(on)
     n.shown = on and true or false
     Shopping.SetNote(n)
     if on then
-        if not note then buildNote() end
+        local built = not note
+        if built then buildNote() end
         placeNote()
         note:Show()
+        -- Styled once placed: built rows and texts against a frame without size before.
+        if built then ShoppingUI.Restyle() end
         needSource(ShoppingUI.Refresh)
     elseif note then
         note:Hide()
@@ -576,6 +578,7 @@ function ShoppingUI.Restyle()
 end
 
 Shopping.OnChange(ShoppingUI.Refresh)
+ns.Items.OnLoaded(ShoppingUI.Refresh)   -- names and colours of items the client had not cached ("…")
 
 -- A boss's tooltip: what it drops from the list, "Name 0/3" like a quest
 -- objective. The loot tables are loaded once on the first boss hovered out of combat.

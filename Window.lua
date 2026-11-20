@@ -56,27 +56,64 @@ local function paintText(fs, kind, c)
 end
 
 -- The client can refuse a theme font on its first use (Bungee) and take it a
--- moment later. Chips and columns were measured in Friz Quadrata meanwhile:
--- everything is styled and measured once more then, at most FONT_RETRIES times.
-local FONT_RETRY, FONT_RETRIES = 1, 2
-local fontRetries, retryQueued = 0, false
-local function fontRefused()
-    if retryQueued or fontRetries >= FONT_RETRIES then return end
-    retryQueued, fontRetries = true, fontRetries + 1
-    C_Timer.After(FONT_RETRY, function()
-        retryQueued = false
+-- moment later, or take it and leave the text blank (seen in game: the note's
+-- header and first row empty through several theme switches). As in the Data
+-- Bar: tried again per text until GetFont reports it, then drawn once more
+-- through another font. Chips and columns were measured in Friz Quadrata
+-- meanwhile: everything is styled and measured once more then (once a frame).
+local FONT_RETRIES, FONT_RETRY = 40, 0.25
+local REDRAW_DELAYS = { 0.5, 2 }
+
+local restyleQueued = false
+local function fontArrived()
+    if restyleQueued then return end
+    restyleQueued = true
+    C_Timer.After(0, function()
+        restyleQueued = false
         Window.Restyle()
+    end)
+end
+
+local function hasFont(fs, path)
+    local got = fs:GetFont()
+    if type(got) ~= "string" then return false end
+    local function plain(p) return (p:lower():gsub("/", "\\")) end
+    return plain(got) == plain(path)
+end
+
+local function setFont(fs, path, size, outline, retries)
+    local wanted = path .. "|" .. size .. "|" .. outline
+    fs.fontWanted = wanted
+    if fs:SetFont(path, size, outline) and hasFont(fs, path) then
+        if fs.fontDrawn ~= wanted then   -- once per text and font
+            fs.fontDrawn = wanted
+            for _, delay in ipairs(REDRAW_DELAYS) do
+                C_Timer.After(delay, function()
+                    if fs.fontWanted ~= wanted then return end
+                    fs:SetFont(ns.Media.DEFAULT_FONT, size, outline)
+                    fs:SetFont(path, size, outline)
+                    local text = fs:GetText()
+                    if text then fs:SetText(""); fs:SetText(text) end
+                    fontArrived()
+                end)
+            end
+        end
+        if retries then fontArrived() end
+        return
+    end
+    fs:SetFont(ns.Media.DEFAULT_FONT, size, outline)
+    retries = retries or FONT_RETRIES
+    if retries <= 0 then return end
+    C_Timer.After(FONT_RETRY, function()
+        -- Restyled since: that call has its own tries.
+        if fs.fontWanted == wanted then setFont(fs, path, size, outline, retries - 1) end
     end)
 end
 
 local function styleText(t)
     local name, add = ns.Themes.BodyFont()
     if t.kind == "title" then name, add = ns.Themes.TitleFont(), 0 end
-    local ok = t.fs:SetFont(ns.Media.FontPath(name), t.size + (add or 0), ns.Themes.Outline())
-    if not ok then
-        t.fs:SetFont(ns.Media.FontPath("Friz Quadrata"), t.size, ns.Themes.Outline())
-        fontRefused()
-    end
+    setFont(t.fs, ns.Media.FontPath(name), t.size + (add or 0), ns.Themes.Outline())
     t.fs:SetShadowOffset(ns.Themes.Outline() == "" and 1 or 0, ns.Themes.Outline() == "" and -1 or 0)
     if t.paint ~= false then paintText(t.fs, t.kind) end
 end
