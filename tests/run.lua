@@ -1056,6 +1056,7 @@ do
     -- A boss's tooltip names what it drops from the list.
     check("boss: npc id from the GUID", Shop.NpcID("Creature-0-1-36-2-1-000ABC"), 1)
     check("boss: players are no boss", Shop.NpcID("Player-1-0ABC"), nil)
+    check("boss: obfuscated realm and server", Shop.NpcID("Creature-0-A3F1-36-9C0E-1-000ABC"), 1)
     issecretvalue = function() return true end
     check("boss: a secret GUID is skipped", Shop.NpcID("Creature-0-1-36-2-1-000ABC"), nil)
     issecretvalue = nil

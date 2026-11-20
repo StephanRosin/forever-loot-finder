@@ -142,10 +142,11 @@ function Shopping.DropsHere(id)
 end
 
 -- The creature's id from its GUID ("Creature-0-…-<npcID>-<spawn>"); nil for
--- players, pets of players and GUIDs Forever keeps secret.
+-- players, pets of players and GUIDs Forever keeps secret. The fields before
+-- the id may be obfuscated (realm, server), so only their count matters.
 function Shopping.NpcID(guid)
     if type(guid) ~= "string" or (issecretvalue and issecretvalue(guid)) then return nil end
-    local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)%-")
+    local kind, id = guid:match("^(%a+)%-[^-]+%-[^-]+%-[^-]+%-[^-]+%-(%d+)%-")
     if kind ~= "Creature" and kind ~= "Vehicle" then return nil end
     return tonumber(id)
 end
