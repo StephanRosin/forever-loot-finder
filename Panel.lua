@@ -292,9 +292,11 @@ function Panel.Show(parent, entry, onClose)
         Panel.ShowMats(drop)
         model:Hide()
     elseif drop.world then
+        -- No one to kill for it: what it costs in the auction house (every item of the last scan is kept).
         panel.entrance:SetText("")
-        panel.who:SetText("")
-        panel.whoDetail:SetText("")
+        local price, at = ns.Prices.Get(drop.item)
+        panel.who:SetText(price and L.AH_PRICE:format(ns.Prices.Money(price)) or L.AH_NONE)
+        panel.whoDetail:SetText(price and at and L.MATS_AGE:format(ns.Prices.Age(at)) or "")
         model:Hide()
     elseif drop.vendor then
         panel.who:SetText(L.VENDOR_NAME:format(drop.vendor))

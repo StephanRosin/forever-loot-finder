@@ -614,6 +614,14 @@ check("fresh prices, one missing: only that hint", mats.hints[1]:GetText(), ns.L
 ForeverLootFinderDB.prices["Testrealm-Alliance"].at = time() - 3 * 86400
 ns.Panel.Refresh()
 check("prices older than 2 days: second hint", mats.hints[2]:GetText(), ns.L.MATS_OLD)
+-- A world drop: its auction price (the scan keeps every item), else a word that there is none.
+ns.Panel.Show(ns.Window.Frame(), { item = { id = 160 }, drops = { { item = 160, instance = "", world = true } } })
+check("world drop: no auction price", P.who:GetText(), ns.L.AH_NONE)
+ForeverLootFinderDB.prices["Testrealm-Alliance"].items[160] = 45000
+ns.Panel.Show(ns.Window.Frame(), { item = { id = 160 }, drops = { { item = 160, instance = "", world = true } } })
+check("world drop: auction price and its age", P.who:GetText() .. " | " .. P.whoDetail:GetText(),
+    ns.L.AH_PRICE:format(Prices.Money(45000)) .. " | " .. ns.L.MATS_AGE:format(Prices.Age(ForeverLootFinderDB.prices["Testrealm-Alliance"].at)))
+openItem(102)   -- back to a row of the window (its × closes through the window)
 Auctionator = { API = { v1 = { GetAuctionPriceByItemID = function(_, id) return id == 14341 and 500 or nil end } } }
 check("Auctionator's price first", Prices.Get(14341), 500)
 Auctionator.API.v1.GetAuctionAgeByItemID = function() return 3 end
