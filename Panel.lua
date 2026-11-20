@@ -262,7 +262,7 @@ function Panel.Show(parent, entry, onClose)
     panel.onClose, panel.entry, panel.parent = onClose, entry, parent
     local drop, place = pick(entry)
     panel.title:SetText(place and place.name or drop.world and L.WORLD_DROP or drop.instance)
-    panel.location:SetText(place and place.location or drop.world and L.WORLD_WHERE or (drop.raid and L.RAID or L.DUNGEON))
+    panel.location:SetText(place and place.location or drop.world and L.WORLD_WHERE or drop.zoneQuest and not drop.raid and L.QUEST or (drop.raid and L.RAID or L.DUNGEON))
     showMap(place)
     local model = panel.model
     panel.map:SetShown(not drop.craft and not drop.world)

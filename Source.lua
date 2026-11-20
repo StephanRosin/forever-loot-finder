@@ -204,7 +204,7 @@ function Source.ReadAtlasLoot(module)
                     bossItems(boss, function(id)
                         if seen[id] then return end
                         seen[id] = true
-                        list[#list + 1] = { item = id, instance = instance, instanceID = content.InstanceID,
+                        list[#list + 1] = { item = id, instance = instance, instanceID = content.InstanceID, area = content.MapID,
                             boss = bossName or "?", npcID = npcID, raid = raid, forever = forever or newBoss,
                             rate = dropRate(npcID, id) }
                     end)
@@ -275,6 +275,50 @@ local function indexBosses(fdj)
     return index
 end
 
+-- The other quests' blue and purple rewards (QuestRewards.lua, Wowhead), not those the
+-- journal has (known: quest ids). The zone is the place, in the client's language.
+-- A quest of a raid's zone (raidAreas: AtlasLoot's MapIDs) is a raid's reward: a token
+-- handed in (Naxxramas' tier pieces), listed with the raids.
+local SIDES = { "Alliance", "Horde" }
+function Source.ReadQuests(known, raidAreas)
+    raidAreas = raidAreas or {}
+    local list, zones = {}, {}
+    for _, q in ipairs(ns.QUEST_REWARDS or {}) do
+        local id, name, zone, side, req, choices, rewards = unpack(q)
+        if not known[id] then
+            if zones[zone] == nil then
+                local area = zone > 0 and C_Map.GetAreaInfo and C_Map.GetAreaInfo(zone)
+                zones[zone] = (area and area ~= "") and area or ns.L.QUEST
+            end
+            for _, set in ipairs({ { choices, true }, { rewards, false } }) do
+                for _, item in ipairs(set[1]) do
+                    list[#list + 1] = { item = item, instance = zones[zone], quest = name, questID = id, choice = set[2],
+                        faction = SIDES[side], requires = req, zoneQuest = true, raid = raidAreas[zone] == true,
+                        raidQuest = raidAreas[zone] }
+                end
+            end
+        end
+    end
+    return list
+end
+
+-- AtlasLoot leaves out the npc id of Forever's new bosses (Bossman Toof): taken
+-- from the journal's boss of that name (or alias), for the model and the tooltip.
+function Source.FillNpcIDs(list, fdj)
+    local byName = {}
+    for _, dungeon in pairs(fdj and fdj.DB or {}) do
+        for _, boss in ipairs(type(dungeon) == "table" and type(dungeon.bosses) == "table" and dungeon.bosses or {}) do
+            if type(boss) == "table" and boss.npcID then
+                if boss.name then byName[boss.name] = boss.npcID end
+                for _, alias in ipairs(type(boss.aliases) == "table" and boss.aliases or {}) do byName[alias] = boss.npcID end
+            end
+        end
+    end
+    for _, d in ipairs(list) do
+        if not d.npcID and d.boss then d.npcID = byName[d.boss] end
+    end
+end
+
 -- Where a drop is, from the journal: { name, location, entrance = { mapID,
 -- x, y, label, detail } }, nil when the journal does not know it (raids).
 function Source.Place(drop)
@@ -334,6 +378,13 @@ function Source.Load()
         for _, d in ipairs(Source.ReadJournal(fdj)) do list[#list + 1] = d end
         names[#names + 1] = "DungeonJournal"
     end
+    Source.FillNpcIDs(list, fdj)
+    local known, raidAreas = {}, {}
+    for _, d in ipairs(list) do
+        if d.questID then known[d.questID] = true end
+        if d.raid and d.area then raidAreas[d.area] = true end
+    end
+    for _, d in ipairs(Source.ReadQuests(known, raidAreas)) do list[#list + 1] = d end
     for _, d in ipairs(list) do
         index[d.item] = index[d.item] or {}
         table.insert(index[d.item], d)

@@ -241,7 +241,7 @@ function Filter.Run(o)
                     wanted = o.vendors
                 elseif d.craft then
                     wanted = o.crafting
-                elseif d.quest then
+                elseif d.quest and not d.raidQuest then   -- a raid's token quest counts as the raid
                     wanted = o.quests and (not d.faction or d.faction == "Both" or d.faction == o.faction)
                         and (not d.classOnly or tostring(d.classOnly):upper() == o.class)
                         and not (o.now and not canQuest(d))
@@ -259,6 +259,11 @@ function Filter.Run(o)
                 and not (o.bestArmor and not Rules.IsBestArmor(o.class, item.classID, item.subClassID,
                     item.equipLoc, wearLevel))
             if keep then Items.Full(item) end
+            -- Wowhead's quests also bring rewards of a quality not known when read: blue and better only.
+            if keep and item.loaded and (item.quality or 0) < 3 then
+                for i = #drops, 1, -1 do if drops[i].zoneQuest then table.remove(drops, i) end end
+                keep = #drops > 0
+            end
             keep = keep and not (not global and item.loaded and not Items.ForClass(item, o.class))
                 and not (not global and o.now and item.loaded and item.reqLevel > o.level)
                 and not (not global and o.now and item.loaded and not Items.SkillMet(item, ranks))

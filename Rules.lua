@@ -543,21 +543,22 @@ end
 
 -- How an item serves a role of a class: fits (a wanted stat, no excluded
 -- one), its points and its main stat. A healing item (more healing than
--- damage) is out for casters; a school's damage is out for all but its casters.
+-- damage) is out for casters; a school's damage is out for all but its casters
+-- (two schools, one of them its own: Robe of Winter Night's frost and shadow serve a shadow priest).
 function Rules.ForRole(role, stats, class, room)
     local p = Rules.Profile(class, role)
     local own = p.schools and Rules.CLASS_SCHOOLS[class] or {}
-    local fits, school = false, schoolDamage(p, class, stats)
+    local fits, school, foreign = false, schoolDamage(p, class, stats), false
     for k, v in pairs(stats) do
         local s = Rules.SCHOOL_OF[k]
         if s then
-            if not own[s] then return false, 0, 0 end
-            fits = true
+            if own[s] then fits = true else foreign = true end
         else
             if p.exclude[k] then return false, 0, 0 end
             if p.want[k] and v > 0 then fits = true end   -- a stat taken away (Mindtap's intellect) is no reason
         end
     end
+    if foreign and school == 0 then return false, 0, 0 end
     if p.healingItemsOut and (stats.HEAL or 0) > (stats.SPELLDMG or 0) + school then return false, 0, 0 end
     -- No mana: more intellect and spirit than strength and agility is someone else's item.
     if p.noMana and (stats.INT or 0) + (stats.SPI or 0) > (stats.STR or 0) + (stats.AGI or 0) + (stats.AP or 0) / 2 then

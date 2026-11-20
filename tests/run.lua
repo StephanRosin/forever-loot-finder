@@ -115,6 +115,7 @@ for _, f in ipairs(tocFiles()) do
     local ok, e = pcall(chunk, ADDON, ns)
     if not ok then error(f .. ": " .. tostring(e)) end
 end
+ns.QUEST_REWARDS = {}   -- the real Wowhead snapshot stays out of the fixtures
 M.Fire("ADDON_LOADED", ADDON)
 -- The hub (Forever Themes) is there: the first login wears its theme.
 local hubColor = LibForeverThemes.COLORS.PITWALL[2].id
@@ -175,6 +176,44 @@ check("place by the boss's npc id", Source.Place(Source.ByItem(102)[1]).name, "T
 check("entrance", Source.Place(Source.ByItem(102)[1]).entrance.mapID, 1436)
 check("no place for a raid", Source.Place(Source.ByItem(103)[1]), nil)
 check("boss display", Source.Display(1), 555)
+-- Wowhead's quest rewards: not the journal's quests, zone from the area id, side as faction.
+local wq = ns.QUEST_REWARDS
+ns.QUEST_REWARDS = { { 214, "Red Silk Bandanas", 40, 1, 17, { 130 }, {} }, { 89015, "Deadliest Catch", 16, 2, 50, { 260212 }, { 132 } },
+    { 7, "Odd", 0, 3, 1, {}, { 133 } } }
+local wr = Source.ReadQuests({ [214] = true })
+check("quest rewards: journal's left out, choice and fixed", #wr, 3)
+check("quest rewards: zone, faction, level, choice", ("%s %s %d %s"):format(wr[1].instance, wr[1].faction, wr[1].requires,
+    tostring(wr[1].choice)), "Area16 Horde 50 true")
+check("quest rewards: no zone, both sides", ("%s %s %s"):format(wr[3].instance, tostring(wr[3].faction), tostring(wr[2].choice)),
+    "Quest nil false")
+-- A quest in a raid's zone (a token handed in): listed with the raid.
+local tq = Source.ReadQuests({}, { [2717] = true })
+check("quest rewards: none in a raid without raid zones", tq[1].raid, false)
+ns.QUEST_REWARDS = { { 9, "Token Turn-in", 2717, 3, 60, {}, { 130 } } }
+tq = Source.ReadQuests({}, { [2717] = true })
+check("quest rewards: token quest in a raid's zone is the raid's", tostring(tq[1].raid) .. " " .. tostring(tq[1].raidQuest), "true true")
+-- Read with an unknown quality: dropped once the client says it is below blue.
+M.items[133] = item("Plain Shirt", 1, 10, 5, "INVTYPE_CHEST", 4, 1, { ITEM_MOD_STAMINA_SHORT = 1 })
+ns.QUEST_REWARDS = { { 7, "Odd", 0, 3, 1, {}, { 133 } } }
+Source.Reset()
+Source.Load()
+local plain = false
+for _, e in ipairs(ns.Filter.Run(ns.Filter.Options({ text = "plain" }))) do if e.item.id == 133 then plain = true end end
+check("quest rewards: a white one left out once loaded", plain, false)
+ns.QUEST_REWARDS = { { 9, "Token Turn-in", 2717, 3, 60, {}, { 130 } } }
+Source.Reset()
+Source.Load()
+local tok
+for _, d in ipairs(Source.ByItem(130)) do if d.questID == 9 then tok = d end end
+check("quest rewards: raid zones from AtlasLoot's MapIDs", tok and tok.raid, true)
+ns.QUEST_REWARDS = wq
+Source.Reset()
+Source.Load()
+-- AtlasLoot without npc id (Forever's new bosses): the journal's boss of that name or alias.
+local noId = { { item = 1, boss = "Toof" }, { item = 2, boss = "Boss Kof" }, { item = 3, boss = "Nobody" } }
+Source.FillNpcIDs(noId, { DB = { X = { bosses = { { name = "Toof", npcID = 264773, aliases = { "Boss Kof" } } } } } })
+check("npc id from the journal by name, alias, none", ("%s %s %s"):format(noId[1].npcID, noId[2].npcID, tostring(noId[3].npcID)),
+    "264773 264773 nil")
 
 section("Priest, healer and caster")
 local list, unknown = run({})
@@ -753,6 +792,11 @@ check("frost boots: mage caster", (Rules.ForRole("CASTER", boots, "MAGE")), true
 check("frost boots: not a bear's", (Rules.ForRole("TANK", boots, "DRUID")), false)
 check("frost boots: not a priest's heal", (Rules.ForRole("HEAL", boots, "PRIEST")), false)
 local _, frostPts, frostMain = Rules.ForRole("CASTER", boots, "MAGE")
+-- Two schools, one the class's own (Robe of Winter Night: frost and shadow 40).
+local winter = { INT = 12, FROSTDMG = 40, SHADOWDMG = 40, ARMOR = 81 }
+check("frost and shadow: a shadow priest's", (Rules.ForRole("CASTER", winter, "PRIEST")), true)
+check("frost and shadow: counts the shadow", select(2, Rules.ForRole("CASTER", winter, "PRIEST")) > select(2, Rules.ForRole("CASTER", { INT = 12, ARMOR = 81 }, "PRIEST")), true)
+check("frost only: still not a priest's", (Rules.ForRole("CASTER", { INT = 12, FROSTDMG = 40 }, "PRIEST")), false)
 check("school damage as spell damage", frostMain, 20)
 local bear = Rules.Stats({ ITEM_MOD_STAMINA_SHORT = 15, ITEM_MOD_AGILITY_SHORT = 10, RESISTANCE0_NAME = 200 })
 local cat = Rules.Stats({ ITEM_MOD_STRENGTH_SHORT = 15, ITEM_MOD_AGILITY_SHORT = 15, RESISTANCE0_NAME = 100 })
@@ -818,7 +862,11 @@ AtlasLoot.Data.Recipe = { GetRecipeForSpell = function(spell)
 check("recipe: none, from the trainer", ns.Panel.RecipeText(4), "Recipe: from the trainer")
 check("recipe: drop and vendor with zones", ns.Panel.RecipeText(1),
     "Recipe: drops from Ice Thistle Yeti (Area618) · vendor Qia (Area618)")
+-- Own data: the shipped list may name these vendors once read.
+local realSources = ns.RECIPE_SOURCES[253974]
+ns.RECIPE_SOURCES[253974] = { { "QUEST", "I Need a Tailor", 0 }, { "VENDOR", "", 405 } }
 check("recipe: quest and vendors of a zone", ns.Panel.RecipeText(2), 'Recipe: quest "I Need a Tailor" · vendors in Area405')
+ns.RECIPE_SOURCES[253974] = realSources
 check("recipe: item of unknown origin", ns.Panel.RecipeText(3), nil)
 check("recipe: Forever's new one by the made item", ns.Panel.RecipeText(5, 254095), "Recipe: world drop")
 ns.RECIPE_SOURCES[999998] = { { "VENDOR", "Hordling", 17, 2 }, { "VENDOR", "Ally", 44, 1 }, { "VENDOR", "Goblin", 405, 3 } }
