@@ -321,14 +321,13 @@ local function charRows()
     }
 end
 
--- The point weights of a class and role (Advanced): one slider per stat the role weighs, its
+-- The point weights of a class and spec (Advanced): one slider per stat the spec weighs, its
 -- default beside the name; buttons back to the defaults.
 local picked = {}
 local function pickedClass() return picked.class or select(2, UnitClass("player")) end
-local function pickedRole()
-    local roles = ns.Rules.CLASS_ROLES[pickedClass()] or {}
-    for _, r in ipairs(roles) do if r == picked.role then return r end end
-    return pickedClass() == select(2, UnitClass("player")) and Settings.Role(pickedClass()) or roles[1]
+local function pickedSpec()
+    for _, s in ipairs(ns.Rules.SPECS[pickedClass()] or {}) do if s.id == picked.spec then return s.id end end
+    return ns.Rules.SpecOf(pickedClass()).id
 end
 local function weightsChanged()
     Settings.Changed("weights")
@@ -349,38 +348,39 @@ local function weightRows()
                 end
                 return list
             end,
-            get = pickedClass, set = function(v) picked.class, picked.role = v, nil; Window.Refresh() end },
+            get = pickedClass, set = function(v) picked.class, picked.spec = v, nil; Window.Refresh() end },
         { type = "select", label = "OPT_WEIGHTS_ROLE",
             choices = function()
                 local list = {}
-                for _, r in ipairs(Rules.CLASS_ROLES[pickedClass()] or {}) do
-                    list[#list + 1] = { label = L[Rules.RoleLabelKey(pickedClass(), r)], value = r }
+                for _, s in ipairs(Rules.SPECS[pickedClass()] or {}) do
+                    list[#list + 1] = { label = L[Rules.SpecLabelKey(pickedClass(), s)], value = s.id }
                 end
                 return list
             end,
-            get = pickedRole, set = function(v) picked.role = v; Window.Refresh() end },
+            get = pickedSpec, set = function(v) picked.spec = v; Window.Refresh() end },
     }
     for _, stat in ipairs(Rules.WEIGHT_KEYS) do
-        local function default() return Rules.Profile(pickedClass(), pickedRole(), true).weights[stat] end
+        local function default() return Rules.SpecProfile(pickedClass(), pickedSpec(), true).weights[stat] end
         rows[#rows + 1] = {
             label = function()
                 local text = L.OPT_WEIGHT_LABEL:format(L["STAT_" .. stat], fmt(default() or 0))
-                local own = Rules.Profile(pickedClass(), pickedRole()).weights[stat]
+                local own = Rules.SpecProfile(pickedClass(), pickedSpec()).weights[stat]
                 if own == default() then return text end
                 -- Changed: in the accent colour.
                 local c = Style.COLORS.accent
                 return ("|cff%02x%02x%02x%s|r"):format(c[1] * 255, c[2] * 255, c[3] * 255, text)
             end,
-            min = 0, max = 5, step = 0.05,
-            get = function() return Rules.Profile(pickedClass(), pickedRole()).weights[stat] or 0 end,
-            set = function(v) Rules.SetWeight(pickedClass(), pickedRole(), stat, v); weightsChanged() end,
-            -- Only the stats the role weighs at all (a zero there counts: mp5 for damage casters).
+            -- Up to 10: weapon DPS weighs up to about 8 (wowsims).
+            min = 0, max = 10, step = 0.05,
+            get = function() return Rules.SpecProfile(pickedClass(), pickedSpec()).weights[stat] or 0 end,
+            set = function(v) Rules.SetWeight(pickedClass(), pickedSpec(), stat, v); weightsChanged() end,
+            -- Only the stats the spec weighs at all (a zero there counts: mp5 for damage casters).
             visible = function() return default() ~= nil end,
         }
     end
     rows[#rows + 1] = { type = "buttons", buttons = {
         { label = "OPT_WEIGHTS_RESET", width = 220, onClick = function()
-            Rules.SetWeight(pickedClass(), pickedRole()); weightsChanged()
+            Rules.SetWeight(pickedClass(), pickedSpec()); weightsChanged()
         end },
         { label = "OPT_WEIGHTS_RESET_ALL", width = 220, onClick = function()
             Rules.ResetWeights(); weightsChanged()

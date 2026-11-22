@@ -384,7 +384,7 @@ check("another filter: list back to the top", ns.Window.State().offset, 0)
 Settings.Set("filterRaids", true)
 check("coloured class name: for a priest", ids(run({ class = "PRIEST", roles = { HEAL = true } }))[129] ~= nil, true)
 check("coloured class name: not for a druid", ids(run({ class = "DRUID", roles = { HEAL = true } }))[129], nil)
-check("healing spirit: priest (Meditation, Spiritual Guidance)", ns.Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 10)
+check("healing spirit: a disc priest's (wowsims)", ns.Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 1.2)
 check("healing spirit: druid (Reflection, Living Spirit)", ns.Rules.Points("HEAL", { SPI = 10 }, "DRUID"), 7)
 check("class-only robe: not for a priest", ids(run({ class = "PRIEST", roles = { HEAL = true } }))[128], nil)
 check("class-only robe: for a mage", ids(run({ class = "MAGE", roles = { CASTER = true } }))[128] ~= nil, true)
@@ -396,11 +396,14 @@ check("best armour: warrior mail no", ids(run({ class = "WARRIOR", roles = { TAN
 Settings.Set("filterBestArmor", false)
 
 section("Better than worn")
+-- Holy: spirit weighs enough (wowsims 0.28) that more of it can make up for less healing.
+Settings.SetSpec("HOLY")
 M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
 got = ids(run({ slot = "CHEST", better = true }))
 check("more healing: upgrade", got[113] and got[113].verdict, "UPGRADE")
 check("upgrade delta", got[113] and math.floor(got[113].delta + 0.5), 7)
 check("less healing, more spirit: alternative", got[110] and got[110].verdict, "ALT")
+Settings.SetSpec("DISC")
 check("the worn one itself: not listed", got[104], nil)
 got = ids(run({ slot = "CHEST", better = true, alternatives = false }))
 check("without alternatives", got[110], nil)
@@ -426,6 +429,26 @@ check("verdict: clearly fewer dropped", Filter.Verdict(5, nil, 10, 0), nil)
 check("verdict: more but less main", Filter.Verdict(20, 5, 10, 8), "ALT")
 
 section("One role at a time")
+-- Specs: the role stored before them picks the first spec of it; a chosen spec replaces it.
+do
+    local char = ns.CharDB()
+    char.spec, char.role = nil, "CASTER"
+    check("spec: old role kept (shadow)", Rules.SpecOf("PRIEST").id, "SHADOW")
+    Settings.SetSpec("HOLY")
+    check("spec: chosen", Rules.SpecOf("PRIEST").id, "HOLY")
+    check("spec: the old role goes", char.role, nil)
+    check("spec: its role", next(Settings.Roles("PRIEST")), "HEAL")
+    check("spec: holy's weights", Rules.Profile("PRIEST", "HEAL").weights.SPI, 0.28)
+    check("spec: another role weighed by its first spec", Rules.Spec("PRIEST", "CASTER").id, "SHADOW")
+    Rules.Choose("WARRIOR", "PROT")
+    check("spec: another class's, this session", next(Settings.Roles("WARRIOR")), "TANK")
+    check("spec: wowsims replace the role's weights", Rules.Profile("WARRIOR", "TANK").weights.DODGE, 0.23)
+    check("spec: not simulated keeps the role's (holy paladin)", Rules.Profile("PALADIN", "HEAL").weights.INT, 0.9)
+    check("spec: melee hunters", Rules.CLASS_ROLES.HUNTER[2], "MELEE")
+    check("spec: melee hunters keep mp5", Rules.ForRole("MELEE", { AGI = 10, MP5 = 4 }, "HUNTER"), true)
+    check("spec: a mage's is shown as its role", Rules.SpecLabelKey("MAGE", Rules.SpecOf("MAGE")), "ROLE_DPS")
+    Settings.SetSpec("DISC")
+end
 check("priest's first role", next(Settings.Roles("PRIEST")), "HEAL")
 M.items[140] = item("Shawl", 3, 60, 55, "INVTYPE_SHOULDER", 4, 1, { [HEAL] = 22, [DMG] = 7, ITEM_MOD_INTELLECT_SHORT = 10 })
 M.items[141] = item("Mantle", 3, 62, 57, "INVTYPE_SHOULDER", 4, 1, { [HEAL] = 15, [DMG] = 15, ITEM_MOD_INTELLECT_SHORT = 12 })
@@ -435,11 +458,11 @@ Source.Load()
 M.state.worn = { [3] = 140 }
 got = ids(run({ slot = "SHOULDER", better = true }))
 check("healer: less healing is no upgrade", got[141] == nil or got[141].verdict ~= "UPGRADE", true)
-Settings.SetRole("CASTER")
+Settings.SetSpec("SHADOW")
 check("role switched", next(Settings.Roles("PRIEST")), "CASTER")
 got = ids(run({ slot = "SHOULDER", better = true }))
 check("caster: more spell damage is", got[141] and got[141].verdict, "UPGRADE")
-Settings.SetRole("HEAL")
+Settings.SetSpec("DISC")
 local diff = Filter.Diff(M.items[141] and ns.Items.Get(141), ns.Items.Get(140))
 local parts = {}
 for _, d in ipairs(diff) do parts[#parts + 1] = ("%s%+d"):format(d.key, d.delta) end
@@ -714,7 +737,7 @@ check("weights page with Advanced", ns.Options.Current(), "weights")
 local page = _G.ForeverLootFinderPageweights
 local sliders = 0
 for _, row in ipairs(page.rows) do if row.slider then sliders = sliders + 1 end end
-check("weights page: the role's stats only (priest healer: 7)", sliders, 7)
+check("weights page: the spec's stats only (disc priest: 6)", sliders, 6)
 Settings.Set("advanced", false)
 -- HD themes are colours of their base: not in the theme menu.
 ns.Themes.Switch("TECH")
@@ -745,6 +768,12 @@ ns.Themes.Switch("CLASSIC")
 
 section("Languages")
 local en, de = ns.Locales.enUS, ns.Locales.deDE
+for class, specs in pairs(Rules.SPECS) do
+    for _, spec in ipairs(specs) do
+        local key = Rules.SpecLabelKey(class, spec)
+        check("spec name " .. key, en[key] ~= nil and de[key] ~= nil, true)
+    end
+end
 local missing = {}
 for k in pairs(en) do if de[k] == nil then missing[#missing + 1] = k end end
 table.sort(missing)
@@ -848,7 +877,8 @@ check("staff (45) vs mace + orb (50): no upgrade, an alternative", weapons()[212
 M.state.worn = { [16] = 213 }
 check("staff over a worn staff: upgrade", weapons()[212] and weapons()[212].verdict, "UPGRADE")
 check("mace beside a worn staff: only an alternative", weapons()[210] and weapons()[210].verdict, "ALT")
-M.state.worn = { [16] = 210, [17] = 211 }
+-- A weak staff worn: several upgrades to sort (the shadow staff's intellect weighs little now, wowsims).
+M.state.worn = { [16] = 213 }
 local w = run({ class = "PRIEST", roles = { HEAL = true }, slot = "MAINHAND", better = true, now = false, sort = "POINTS" })
 local sorted = true
 for i = 2, #w do if (w[i].delta or -1e9) > (w[i - 1].delta or -1e9) then sorted = false end end
@@ -891,23 +921,30 @@ local tap = {}
 Rules.AddUse(18371, tap)
 check("Mindtap: not for damage casters (mana only, less intellect)", (Rules.ForRole("CASTER", tap, "PRIEST")), false)
 check("Mindtap: for healers", (Rules.ForRole("HEAL", tap, "PRIEST")), true)
-check("damage casters: no points for mp5", Rules.Points("CASTER", { MP5 = 10 }, "SHAMAN"), 0)
+check("damage casters: no points for mp5 (mage, not simulated)", Rules.Points("CASTER", { MP5 = 10 }, "MAGE"), 0)
+check("elemental: mp5 as wowsims weighs it", Rules.Points("CASTER", { MP5 = 10 }, "SHAMAN"), 0.4)
 -- Own weights (options, Advanced).
-check("weights: default", Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 10)
-Rules.SetWeight("PRIEST", "HEAL", "SPI", 0.5)
+check("weights: default (disc, wowsims)", Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 1.2)
+Rules.SetWeight("PRIEST", "DISC", "SPI", 0.5)
 check("weights: own weight counts", Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 5)
 check("weights: marked as own", Rules.HasCustom("PRIEST", "HEAL"), true)
-check("weights: defaults still known", Rules.Profile("PRIEST", "HEAL", true).weights.SPI, 1.0)
+check("weights: stored per spec", ns.DB().weights["PRIEST:DISC"].SPI, 0.5)
+check("weights: defaults still known", Rules.SpecProfile("PRIEST", "DISC", true).weights.SPI, 0.12)
+check("weights: other specs untouched", Rules.SpecProfile("PRIEST", "HOLY").weights.SPI, 0.28)
 check("weights: other roles untouched", Rules.HasCustom("PRIEST", "CASTER"), false)
 check("weights: rules unchanged (want, main)", Rules.Profile("PRIEST", "HEAL").main, "HEAL")
-Rules.SetWeight("PRIEST", "HEAL", "SPI", 1.0)
+Rules.SetWeight("PRIEST", "DISC", "SPI", 0.12)
 check("weights: the default again is not stored", ns.DB().weights, nil)
-Rules.SetWeight("PRIEST", "HEAL", "SPI", 2); Rules.SetWeight("DRUID", "HEAL", "INT", 1)
-Rules.SetWeight("PRIEST", "HEAL")
-check("weights: role back to defaults", Rules.HasCustom("PRIEST", "HEAL") or Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 10)
+Rules.SetWeight("PRIEST", "DISC", "SPI", 2); Rules.SetWeight("DRUID", "RESTO", "INT", 1)
+Rules.SetWeight("PRIEST", "DISC")
+check("weights: spec back to defaults", Rules.HasCustom("PRIEST", "HEAL") or Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 1.2)
 check("weights: other class kept", Rules.HasCustom("DRUID", "HEAL"), true)
 Rules.ResetWeights()
 check("weights: all back", Rules.HasCustom("DRUID", "HEAL"), false)
+-- Weights saved per role before specs are no spec's: ignored.
+ns.DB().weights = { ["PRIEST:HEAL"] = { SPI = 9 } }
+check("weights: old role keys ignored", Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 1.2)
+Rules.ResetWeights()
 Rules.SetWeight("MAGE", "CASTER", "HIT", 3)
 Settings.Reset()
 check("weights: reset of all settings clears them", Rules.Points("CASTER", { HIT = 1 }, "MAGE"), 1.2)

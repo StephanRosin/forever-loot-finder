@@ -229,14 +229,9 @@ local function classColor(class)
     return c and { c.r, c.g, c.b } or colour("text")
 end
 
+-- The role of the chosen spec (another class: its first spec until another is chosen in this session).
 local function roles()
-    local class = currentClass()
-    local _, own = UnitClass("player")
-    if class == own then return Settings.Roles(class) end
-    -- Another class: its first role, until another is chosen in this session.
-    state.otherRole = state.otherRole or {}
-    local role = state.otherRole[class] or (Rules.CLASS_ROLES[class] or {})[1]
-    return role and { [role] = true } or {}
+    return Settings.Roles(currentClass())
 end
 
 local function filterRow()
@@ -249,20 +244,24 @@ local function filterRow()
     flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
 end
 
--- A role chip picks its role; the picked one stays (one role at a time).
--- Tanks wear their heaviest armour: choosing the role turns the filter on
+-- A spec chip picks its spec; the picked one stays (one at a time).
+-- Tanks wear their heaviest armour: choosing a tank spec turns the filter on
 -- (it can be turned off again).
 local function tankArmor(class)
     if Rules.HasArmorChoice(class) and not S("filterBestArmor") then Settings.Set("filterBestArmor", true) end
 end
 
-local function setRole(role, on)
+local function setSpec(spec, on)
     if not on then return end
     local class = currentClass()
-    if role == "TANK" then tankArmor(class) end
+    if spec.role == "TANK" then tankArmor(class) end
     local _, own = UnitClass("player")
-    if class == own then Settings.SetRole(role) else state.otherRole = state.otherRole or {}; state.otherRole[class] = role end
+    if class == own then Settings.SetSpec(spec.id) else Rules.Choose(class, spec.id) end
 end
+
+-- The class's i-th spec (the chips are made once and relabelled per class).
+local function specAt(i) return (Rules.SPECS[currentClass()] or {})[i] end
+local MAX_SPECS = 4
 
 local function buildClassMenu()
     local menu = CreateFrame("Frame", nil, frame)
@@ -480,7 +479,7 @@ local function newRow(parent)
                 parts[#parts + 1] = ("%s %s"):format(L["STAT_" .. p[1]] or p[1], (("%.1f"):format(p[2]):gsub("%.0$", "")))
             end
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(L.POINTS_TIP:format(L["ROLE_" .. e.pointsRole] or e.pointsRole,
+            GameTooltip:AddLine(L.POINTS_TIP:format(L[Rules.SpecLabelKey(currentClass(), Rules.Spec(currentClass(), e.pointsRole))] or e.pointsRole,
                 (("%.1f"):format(e.points):gsub("%.0$", ""))), 1, 0.82, 0)
             GameTooltip:AddLine(table.concat(parts, " + "), 0.85, 0.85, 0.85, true)
             if Rules.HasCustom(currentClass(), e.pointsRole) then GameTooltip:AddLine(L.POINTS_CUSTOM, 0.6, 0.6, 0.6) end
@@ -707,7 +706,7 @@ local function build()
     frame.tabs.loot:SetPoint("RIGHT", frame.tabs.shop, "LEFT", -CHIP_GAP, 0)
     frame.shop = ns.ShoppingUI.BuildPanel(frame)
 
-    -- Row 1: class, roles, search.
+    -- Row 1: class, specs, search.
     frame.classChip = Chip(body, function() return className(currentClass()) end, function() return true end, nil,
         { dot = true })
     frame.classChip:SetScript("OnClick", function()
@@ -715,10 +714,12 @@ local function build()
     end)
     frame.classMenu = buildClassMenu()
     frame.classMenu:SetPoint("TOPLEFT", frame.classChip, "BOTTOMLEFT", 0, -2)
-    frame.roleChips = {}
-    for _, role in ipairs(Rules.ROLES) do
-        frame.roleChips[role] = Chip(body, function() return L[Rules.RoleLabelKey(currentClass(), role)] end, function() return roles()[role] == true end,
-            function(v) setRole(role, v) end)
+    frame.specChips = {}
+    for i = 1, MAX_SPECS do
+        frame.specChips[i] = Chip(body,
+            function() local s = specAt(i); return s and L[Rules.SpecLabelKey(currentClass(), s)] or "" end,
+            function() local s = specAt(i); return s ~= nil and Rules.SpecOf(currentClass()).id == s.id end,
+            function(v) local s = specAt(i); if s then setSpec(s, v) end end)
     end
     local box = CreateFrame("EditBox", "ForeverLootFinderSearch", body)
     box:SetSize(170, CHIP_H)
@@ -828,20 +829,18 @@ end
 -- ---------------------------------------------------------------------------
 local TOP_LIST = TITLE_H + 10 + 3 * (CHIP_H + 8) + SLOT_SIZE + 50
 
--- Places what comes and goes: the role chips of the class, the worn row.
+-- Places what comes and goes: the spec chips of the class, the worn row.
 function Window.Relayout()
     if not frame then return end
     local class = currentClass()
     frame.classChip:Relabel()
     paintText(frame.classChip.text, nil, classColor(class))
-    local classRoles = {}
-    for _, role in ipairs(Rules.CLASS_ROLES[class] or {}) do classRoles[role] = true end
     local row1 = { frame.classChip }
-    for _, role in ipairs(Rules.ROLES) do
-        frame.roleChips[role]:SetShown(classRoles[role] == true)
-        row1[#row1 + 1] = frame.roleChips[role]
+    for i, chip in ipairs(frame.specChips) do
+        chip:SetShown(specAt(i) ~= nil)
+        chip:Relabel()
+        row1[#row1 + 1] = chip
     end
-    for _, role in ipairs(Rules.ROLES) do frame.roleChips[role]:Relabel() end
     flow(row1, frame, PAD, -(TITLE_H + 10))
     frame.hereChip:SetShown(ns.Source.Here() ~= nil)
     frame.hereChip:Relabel()

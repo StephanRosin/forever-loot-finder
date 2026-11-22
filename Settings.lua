@@ -83,15 +83,12 @@ function Settings.Set(key, value)
     Settings.Changed(key)
 end
 
--- The roles chosen for the player's class: every role of it until chosen.
--- One role at a time ({ HEAL = true }): healing and damage are measured
--- differently, an item better for one would count as an upgrade for both.
--- The character's chosen role, else the class's first.
+-- The role of the spec chosen for the class (Rules.SpecOf). One role at a
+-- time ({ HEAL = true }): healing and damage are measured differently, an
+-- item better for one would count as an upgrade for both.
 function Settings.Role(class)
-    local list = ns.Rules.CLASS_ROLES[class] or {}
-    local stored = ns.CharDB().role
-    for _, role in ipairs(list) do if role == stored then return role end end
-    return list[1]
+    local spec = ns.Rules.SpecOf(class)
+    return spec and spec.role
 end
 
 function Settings.Roles(class)
@@ -99,8 +96,10 @@ function Settings.Roles(class)
     return role and { [role] = true } or {}
 end
 
-function Settings.SetRole(role)
-    ns.CharDB().role = role
+-- The character's spec (an id of Rules.SPECS); the role stored before specs goes.
+function Settings.SetSpec(id)
+    local char = ns.CharDB()
+    char.spec, char.role = id, nil
     Settings.Changed("roles")
 end
 

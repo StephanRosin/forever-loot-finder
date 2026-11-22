@@ -16,17 +16,95 @@ ns.Rules = Rules
 
 Rules.CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 Rules.ROLES = { "HEAL", "CASTER", "TANK", "MELEE", "RANGED" }
-Rules.CLASS_ROLES = {
-    WARRIOR = { "TANK", "MELEE" },
-    PALADIN = { "HEAL", "TANK", "MELEE" },
-    HUNTER = { "RANGED" },
-    ROGUE = { "MELEE" },
-    PRIEST = { "HEAL", "CASTER" },
-    SHAMAN = { "HEAL", "CASTER", "MELEE" },
-    MAGE = { "CASTER" },
-    WARLOCK = { "CASTER" },
-    DRUID = { "HEAL", "CASTER", "TANK", "MELEE" },
+-- What the window offers per class: its specs, each with a role (what it
+-- wants, excludes, its main stat). A spec without a name of its own (id =
+-- its role) is shown as the role.
+Rules.SPECS = {
+    WARRIOR = { { id = "ARMS", role = "MELEE" }, { id = "FURY", role = "MELEE" }, { id = "PROT", role = "TANK" } },
+    PALADIN = { { id = "HOLY", role = "HEAL" }, { id = "PROT", role = "TANK" }, { id = "RET", role = "MELEE" } },
+    HUNTER = { { id = "TURRET", role = "RANGED" }, { id = "WEAVE", role = "RANGED" }, { id = "MELEE", role = "MELEE" } },
+    ROGUE = { { id = "ASSA", role = "MELEE" }, { id = "COMBAT", role = "MELEE" }, { id = "SUB", role = "MELEE" } },
+    PRIEST = { { id = "DISC", role = "HEAL" }, { id = "HOLY", role = "HEAL" }, { id = "SHADOW", role = "CASTER" },
+        { id = "SMITE", role = "CASTER" } },
+    SHAMAN = { { id = "ELE", role = "CASTER" }, { id = "ENH", role = "MELEE" }, { id = "RESTO", role = "HEAL" } },
+    MAGE = { { id = "CASTER", role = "CASTER" } },
+    WARLOCK = { { id = "CASTER", role = "CASTER" } },
+    DRUID = { { id = "BALANCE", role = "CASTER" }, { id = "CAT", role = "MELEE" }, { id = "BEAR", role = "TANK" },
+        { id = "RESTO", role = "HEAL" } },
 }
+
+-- The roles of each class, in the order of its specs.
+Rules.CLASS_ROLES = {}
+for class, specs in pairs(Rules.SPECS) do
+    local list, seen = {}, {}
+    for _, spec in ipairs(specs) do
+        if not seen[spec.role] then seen[spec.role], list[#list + 1] = true, spec.role end
+    end
+    Rules.CLASS_ROLES[class] = list
+end
+
+-- A spec's weights, from wowsims (github.com/wowsims/forever, MIT, ui/specs/*/presets.ts as of
+-- 2026-11-22): their simulated EP per point, several presets of a spec averaged, put on our
+-- scale (healing, spell damage, stamina or agility 1; melee attack power 0.5) and our stats
+-- (haste, expertise, armour penetration and school damage have none; weapon DPS: the main
+-- hand's, ranged for ranged specs). They replace the role's weights. Specs wowsims has not
+-- simulated (holy and protection paladins, restoration shamans and druids, mages, warlocks)
+-- keep the role's with CLASS_PROFILES.
+Rules.SPEC_WEIGHTS = {
+    ["WARRIOR:ARMS"] = { STR = 1.1, AGI = 0.88, AP = 0.5, DPS = 8.36, HIT = 2.52, CRIT = 1.16 },
+    ["WARRIOR:FURY"] = { STR = 1.1, AGI = 0.85, AP = 0.5, DPS = 6.29, HIT = 0.84, CRIT = 1.13 },
+    ["WARRIOR:PROT"] = { STA = 1, STR = 0.54, AGI = 0.53, AP = 0.23, DPS = 1.25, HIT = 0.04, CRIT = 0.37, DEF = 0.43, DODGE = 0.23, PARRY = 0.21, BLOCKVAL = 0.6, ARMOR = 0.05 },
+    ["PALADIN:RET"] = { SPELLDMG = 2.04, MP5 = 0.06, INT = 1.65, STR = 1.23, AGI = 1.33, AP = 0.5, DPS = 6.72, HIT = 4.27, CRIT = 1.94 },
+    ["HUNTER:TURRET"] = { MP5 = 0.41, INT = 0.64, AGI = 1, RAP = 0.34, DPS = 3.29, HIT = 1.26, RHIT = 1.26, CRIT = 0.87, RCRIT = 0.87 },
+    ["HUNTER:WEAVE"] = { MP5 = 0.12, INT = 0.44, STR = 0.22, AGI = 1, AP = 0.2, RAP = 0.2, DPS = 1.69, HIT = 1.43, RHIT = 1.43, CRIT = 0.83, RCRIT = 0.83 },
+    ["HUNTER:MELEE"] = { MP5 = 0.31, INT = 0.95, STR = 0.55, AGI = 1.35, AP = 0.5, RAP = 0.2, DPS = 6.57, HIT = 3.35, CRIT = 1.35 },
+    ["ROGUE:ASSA"] = { STA = 0.01, STR = 0.55, AGI = 1.03, AP = 0.5, DPS = 4.22, HIT = 1.4, CRIT = 1.01 },
+    ["ROGUE:COMBAT"] = { STA = 0.01, STR = 0.55, AGI = 0.98, AP = 0.5, DPS = 5.19, HIT = 1.19, CRIT = 0.84 },
+    ["ROGUE:SUB"] = { STA = 0.01, STR = 0.55, AGI = 0.96, AP = 0.5, DPS = 5.24, HIT = 1.06, CRIT = 0.81 },
+    ["PRIEST:DISC"] = { HEAL = 1, MP5 = 0.3, INT = 0.2, SPI = 0.12, CRIT = 0.59, SCRIT = 0.59 },
+    ["PRIEST:HOLY"] = { HEAL = 1, MP5 = 0.6, INT = 0.32, SPI = 0.28, CRIT = 0.27, SCRIT = 0.27 },
+    ["PRIEST:SHADOW"] = { SPELLDMG = 1, INT = 0.24, SPI = 0.01, HIT = 1.14, SHIT = 1.14, CRIT = 0.84, SCRIT = 0.84 },
+    ["PRIEST:SMITE"] = { SPELLDMG = 1, MP5 = 1.46, INT = 0.58, SPI = 0.57, HIT = 0.37, SHIT = 0.37, CRIT = 0.32, SCRIT = 0.32 },
+    ["SHAMAN:ELE"] = { SPELLDMG = 1, MP5 = 0.04, INT = 0.19, SPI = 0.02, HIT = 1.18, SHIT = 1.18, CRIT = 0.61, SCRIT = 0.61 },
+    ["SHAMAN:ENH"] = { SPELLDMG = 0.64, INT = 0.99, STR = 1.1, AGI = 0.66, AP = 0.5, DPS = 7.09, HIT = 2.6, CRIT = 1.21 },
+    ["DRUID:BALANCE"] = { SPELLDMG = 1, MP5 = 0.07, INT = 0.24, HIT = 1.46, SHIT = 1.46, CRIT = 0.76, SCRIT = 0.76 },
+    ["DRUID:CAT"] = { STR = 1.22, AGI = 1.34, AP = 0.5, FAP = 0.5, DPS = 4.39, HIT = 1.07, CRIT = 1.04 },
+    ["DRUID:BEAR"] = { STA = 1, STR = 0.48, AGI = 0.43, AP = 0.22, FAP = 0.22, DPS = 3.08, HIT = 0.69, CRIT = 0.36, DEF = 0.87, DODGE = 0.11, ARMOR = 0.17 },
+}
+
+-- The spec chosen for another class in the window (this session); the
+-- player's own class: the character's (ForeverLootFinderChar.spec).
+local chosen = {}
+
+local function ownClass() return select(2, UnitClass("player")) end
+
+-- The chosen spec of a class, else the first of the role stored before
+-- specs (ForeverLootFinderChar.role), else its first.
+function Rules.SpecOf(class)
+    local specs = Rules.SPECS[class] or {}
+    local char = class == ownClass() and ns.CharDB and ns.CharDB() or {}
+    local id = char.spec or chosen[class]
+    for _, spec in ipairs(specs) do if spec.id == id then return spec end end
+    for _, spec in ipairs(specs) do if spec.role == char.role then return spec end end
+    return specs[1]
+end
+
+-- The spec weighing a role: the chosen one when it has that role, else the class's first of it.
+function Rules.Spec(class, role)
+    local spec = Rules.SpecOf(class)
+    if spec and spec.role == role then return spec end
+    for _, s in ipairs(Rules.SPECS[class] or {}) do if s.role == role then return s end end
+    return { id = role, role = role }
+end
+
+-- Another class's spec, for this session (the player's own: Settings.SetSpec).
+function Rules.Choose(class, id) chosen[class] = id end
+
+-- The locale key of a spec's name: its own, or its role's.
+function Rules.SpecLabelKey(class, spec)
+    if spec.id == spec.role then return Rules.RoleLabelKey(class, spec.role) end
+    return "SPEC_" .. class .. "_" .. spec.id
+end
 
 -- The label of a role for a class: plain "DPS" when the class deals damage
 -- one way only, "Melee DPS" / "Caster DPS" for shamans and druids.
@@ -137,26 +215,40 @@ Rules.CLASS_PROFILES = {
     WARLOCK = { CASTER = { weights = { STA = 0.4, SPI = 0 } } },
     ROGUE = { MELEE = { weights = { STR = 0.5 }, noMana = true } },
     WARRIOR = { MELEE = { noMana = true }, TANK = { noMana = true } },
+    -- Melee hunters still cast from mana (wowsims weighs their intellect and mp5).
+    HUNTER = { MELEE = { exclude = { MP5 = false } } },
 }
 
 local profiles, defaults, dynamics = {}, {}, {}
 local dynamic
 
--- The player's own weights (options, "Advanced"): ForeverLootFinderDB.weights["CLASS:ROLE"] = { stat = weight },
+-- The player's own weights (options, "Advanced"): ForeverLootFinderDB.weights["CLASS:SPEC"] = { stat = weight },
 -- only those that differ from the default.
-local function custom(class, role)
+local function custom(class, spec)
     local db = ns.DB and ns.DB().weights
-    return db and db[tostring(class) .. ":" .. role] or nil
+    return db and db[tostring(class) .. ":" .. spec] or nil
 end
 
--- The role's profile for a class (the role's own when the class has no override), with the
--- player's own weights; plain: without them (the defaults the options show).
+-- The profile a role is weighed by for a class: that of its spec (Rules.Spec).
 function Rules.Profile(class, role, plain)
-    local key = tostring(class) .. role
-    local own = not plain and custom(class, role)
+    return Rules.SpecProfile(class, Rules.Spec(class, role).id, plain)
+end
+
+local function specEntry(class, id)
+    for _, s in ipairs(Rules.SPECS[class] or {}) do if s.id == id then return s end end
+    return { id = id, role = id }
+end
+
+-- A spec's profile: its role's rules with the class's overrides, the spec's
+-- weights (else the role's with the class's), and the player's own weights;
+-- plain: without them (the defaults the options show).
+function Rules.SpecProfile(class, id, plain)
+    local role = specEntry(class, id).role
+    local key = tostring(class) .. ":" .. id
+    local own = not plain and custom(class, id)
     if own then
         if profiles[key] then return profiles[key] end
-        local d = Rules.Profile(class, role, true)
+        local d = Rules.SpecProfile(class, id, true)
         local p = setmetatable({ weights = {} }, { __index = d })
         for k, v in pairs(d.weights) do p.weights[k] = v end
         for k, v in pairs(own) do p.weights[k] = v end
@@ -172,18 +264,23 @@ function Rules.Profile(class, role, plain)
         for k, v in pairs(b[f]) do p[f][k] = v end
         for k, v in pairs(o[f] or {}) do p[f][k] = v or nil end
     end
+    local sw = Rules.SPEC_WEIGHTS[key]
+    if sw then
+        p.weights = {}
+        for k, v in pairs(sw) do p.weights[k] = v end
+    end
     defaults[key] = p
     return p
 end
 
--- Sets one of the player's weights (the default again: dropped); nil weight: all of class and role back.
-function Rules.SetWeight(class, role, stat, weight)
+-- Sets one of the player's weights for a spec (the default again: dropped); no stat: all of it back.
+function Rules.SetWeight(class, id, stat, weight)
     local db = ns.DB()
     db.weights = db.weights or {}
-    local key = tostring(class) .. ":" .. role
+    local key = tostring(class) .. ":" .. id
     if stat then
         local t = db.weights[key] or {}
-        local default = Rules.Profile(class, role, true).weights[stat] or 0
+        local default = Rules.SpecProfile(class, id, true).weights[stat] or 0
         if weight and math.abs(weight - default) < 1e-6 then weight = nil end
         t[stat] = weight
         db.weights[key] = next(t) and t or nil
@@ -194,8 +291,8 @@ function Rules.SetWeight(class, role, stat, weight)
     profiles, dynamics = {}, {}
 end
 
--- Whether the player weighs this class and role differently.
-function Rules.HasCustom(class, role) return custom(class, role) ~= nil end
+-- Whether the player weighs the spec of this class and role differently.
+function Rules.HasCustom(class, role) return custom(class, Rules.Spec(class, role).id) ~= nil end
 
 -- All of the player's weights back to the defaults.
 function Rules.ResetWeights()
@@ -305,9 +402,10 @@ end
 function dynamic(class, role)
     local c, d = Rules.char, Rules.DYNAMIC[role]
     if not (c and d and c[role] and c.class == class and (c[role].hitValue or 0) > 0) then return nil end
-    local key = class .. role
+    local spec = Rules.Spec(class, role).id
+    local key = class .. ":" .. spec
     if dynamics[key] ~= nil then return dynamics[key] or nil end
-    local p, own, ch = Rules.Profile(class, role), custom(class, role) or {}, c[role]
+    local p, own, ch = Rules.Profile(class, role), custom(class, spec) or {}, c[role]
     local unit = p.weights[d.unit] or 0
     local w = { hit = {}, weights = {}, over = ch.over, char = ch }
     for _, k in ipairs(d.hit) do
