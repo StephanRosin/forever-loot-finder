@@ -86,7 +86,7 @@ end
 
 -- Stat by stat what item gives over worn: { { key, delta } } in a fixed order.
 local ORDER = { "STR", "AGI", "STA", "INT", "SPI", "HEAL", "SPELLDMG", "MP5", "SHIT", "SCRIT", "AP", "RAP", "FAP",
-    "HIT", "RHIT", "CRIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "ARMOR", "DPS",
+    "HIT", "RHIT", "CRIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "ARMOR", "DPS", "ODPS", "RDPS",
     "FIREDMG", "FROSTDMG", "SHADOWDMG", "NATUREDMG", "ARCANEDMG", "HOLYDMG" }
 function Filter.Diff(item, worn)
     local a, b, list = item.stats or {}, worn and worn.stats or {}, {}
@@ -109,6 +109,8 @@ local RANK = { UPGRADE = 2, ALT = 1 }
 
 local function evaluate(item, o, slot)
     local stats = item.stats or {}
+    -- A one-hander looked at for the off hand: its DPS as an off hand's.
+    if slot == Rules.SLOT.OFFHAND then stats = Rules.AsOffHand(stats, item.equipLoc) end
     local entry = { item = item, roles = {}, slot = slot }
     if not item.loaded then
         entry.unclear = true

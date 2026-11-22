@@ -21,14 +21,16 @@ Rules.ROLES = { "HEAL", "CASTER", "TANK", "MELEE", "RANGED" }
 -- its role) is shown as the role.
 Rules.SPECS = {
     WARRIOR = { { id = "ARMS", role = "MELEE" }, { id = "FURY", role = "MELEE" }, { id = "PROT", role = "TANK" } },
-    PALADIN = { { id = "HOLY", role = "HEAL" }, { id = "PROT", role = "TANK" }, { id = "RET", role = "MELEE" } },
+    PALADIN = { { id = "HOLY", role = "HEAL" }, { id = "PROT", role = "TANK" }, { id = "HOLYSHOCK", role = "MELEE" },
+        { id = "UNSEALED", role = "MELEE" } },
     HUNTER = { { id = "TURRET", role = "RANGED" }, { id = "WEAVE", role = "RANGED" }, { id = "MELEE", role = "MELEE" } },
     ROGUE = { { id = "ASSA", role = "MELEE" }, { id = "COMBAT", role = "MELEE" }, { id = "SUB", role = "MELEE" } },
-    PRIEST = { { id = "DISC", role = "HEAL" }, { id = "HOLY", role = "HEAL" }, { id = "SHADOW", role = "CASTER" },
-        { id = "SMITE", role = "CASTER" } },
+    PRIEST = { { id = "DISC", role = "HEAL" }, { id = "HOLY", role = "HEAL" }, { id = "SHADOW", role = "CASTER" } },
     SHAMAN = { { id = "ELE", role = "CASTER" }, { id = "ENH", role = "MELEE" }, { id = "RESTO", role = "HEAL" } },
-    MAGE = { { id = "CASTER", role = "CASTER" } },
-    WARLOCK = { { id = "CASTER", role = "CASTER" } },
+    MAGE = { { id = "ARCANE", role = "CASTER" }, { id = "FIRE", role = "CASTER" }, { id = "FROST", role = "CASTER" },
+        { id = "FFB", role = "CASTER" } },
+    WARLOCK = { { id = "AFF", role = "CASTER" }, { id = "DEMO", role = "CASTER" }, { id = "DESTRO", role = "CASTER" },
+        { id = "SMRUIN", role = "CASTER" } },
     DRUID = { { id = "BALANCE", role = "CASTER" }, { id = "CAT", role = "MELEE" }, { id = "BEAR", role = "TANK" },
         { id = "RESTO", role = "HEAL" } },
 }
@@ -43,34 +45,48 @@ for class, specs in pairs(Rules.SPECS) do
     Rules.CLASS_ROLES[class] = list
 end
 
--- A spec's weights, from wowsims (github.com/wowsims/forever, MIT, ui/specs/*/presets.ts as of
--- 2026-11-22): their simulated EP per point, several presets of a spec averaged, put on our
--- scale (healing, spell damage, stamina or agility 1; melee attack power 0.5) and our stats
--- (haste, expertise, armour penetration and school damage have none; weapon DPS: the main
--- hand's, ranged for ranged specs). They replace the role's weights. Specs wowsims has not
--- simulated (holy and protection paladins, restoration shamans and druids, mages, warlocks)
--- keep the role's with CLASS_PROFILES.
+-- A spec's weights per point, from wowsims (github.com/wowsims/forever, MIT, as of 2026-11-22):
+-- the EP of its presets (ui/specs/*/presets.ts, druid/feral_ep.ts; several of a spec averaged)
+-- or, where it has none, simulated with its own sim on its test setups (mage, warlock: DPS EP;
+-- protection paladin: threat EP; 60000 iterations). Put on our scale (healing, spell damage,
+-- stamina or agility 1; melee attack power 0.5) and our stats: haste, expertise, armour
+-- penetration and school damage have none; generic attack power counts for hunters as ranged
+-- too (wowsims' Pawn export). The priest healers' are set by hand there (no healing sim).
+-- They replace the role's weights. Without: holy paladins, restoration shamans and druids.
 Rules.SPEC_WEIGHTS = {
     ["WARRIOR:ARMS"] = { STR = 1.1, AGI = 0.88, AP = 0.5, DPS = 8.36, HIT = 2.52, CRIT = 1.16 },
-    ["WARRIOR:FURY"] = { STR = 1.1, AGI = 0.85, AP = 0.5, DPS = 6.29, HIT = 0.84, CRIT = 1.13 },
+    ["WARRIOR:FURY"] = { STR = 1.1, AGI = 0.85, AP = 0.5, DPS = 6.29, ODPS = 1.33, HIT = 0.84, CRIT = 1.13 },
     ["WARRIOR:PROT"] = { STA = 1, STR = 0.54, AGI = 0.53, AP = 0.23, DPS = 1.25, HIT = 0.04, CRIT = 0.37, DEF = 0.43, DODGE = 0.23, PARRY = 0.21, BLOCKVAL = 0.6, ARMOR = 0.05 },
-    ["PALADIN:RET"] = { SPELLDMG = 2.04, MP5 = 0.06, INT = 1.65, STR = 1.23, AGI = 1.33, AP = 0.5, DPS = 6.72, HIT = 4.27, CRIT = 1.94 },
-    ["HUNTER:TURRET"] = { MP5 = 0.41, INT = 0.64, AGI = 1, RAP = 0.34, DPS = 3.29, HIT = 1.26, RHIT = 1.26, CRIT = 0.87, RCRIT = 0.87 },
-    ["HUNTER:WEAVE"] = { MP5 = 0.12, INT = 0.44, STR = 0.22, AGI = 1, AP = 0.2, RAP = 0.2, DPS = 1.69, HIT = 1.43, RHIT = 1.43, CRIT = 0.83, RCRIT = 0.83 },
-    ["HUNTER:MELEE"] = { MP5 = 0.31, INT = 0.95, STR = 0.55, AGI = 1.35, AP = 0.5, RAP = 0.2, DPS = 6.57, HIT = 3.35, CRIT = 1.35 },
-    ["ROGUE:ASSA"] = { STA = 0.01, STR = 0.55, AGI = 1.03, AP = 0.5, DPS = 4.22, HIT = 1.4, CRIT = 1.01 },
-    ["ROGUE:COMBAT"] = { STA = 0.01, STR = 0.55, AGI = 0.98, AP = 0.5, DPS = 5.19, HIT = 1.19, CRIT = 0.84 },
-    ["ROGUE:SUB"] = { STA = 0.01, STR = 0.55, AGI = 0.96, AP = 0.5, DPS = 5.24, HIT = 1.06, CRIT = 0.81 },
+    ["PALADIN:PROT"] = { SPELLDMG = 1, MP5 = 0.12, INT = 0.08, STA = 0.05, STR = 0.45, AGI = 0.31, AP = 0.19, HIT = 1.89, CRIT = 0.63, DEF = 0.19, DODGE = 0.2, PARRY = 0.08, BLOCK = 0.75 },
+    ["PALADIN:HOLYSHOCK"] = { SPELLDMG = 2.89, MP5 = 0.01, INT = 2.27, STR = 1.25, AGI = 1.55, AP = 0.5, DPS = 6.52, HIT = 5.12, CRIT = 2.33 },
+    ["PALADIN:UNSEALED"] = { SPELLDMG = 1.18, MP5 = 0.12, INT = 1.03, STR = 1.2, AGI = 1.11, AP = 0.5, DPS = 6.92, HIT = 3.42, CRIT = 1.54 },
+    ["HUNTER:TURRET"] = { MP5 = 0.41, INT = 0.64, AGI = 1, AP = 0.34, RAP = 0.34, RDPS = 3.29, HIT = 1.26, RHIT = 1.26, CRIT = 0.87, RCRIT = 0.87 },
+    ["HUNTER:WEAVE"] = { MP5 = 0.12, INT = 0.44, STR = 0.22, AGI = 1, AP = 0.4, RAP = 0.2, DPS = 2.93, RDPS = 1.69, HIT = 1.43, RHIT = 1.43, CRIT = 0.83, RCRIT = 0.83 },
+    ["HUNTER:MELEE"] = { MP5 = 0.31, INT = 0.94, STR = 0.55, AGI = 1.35, AP = 0.7, RAP = 0.2, DPS = 6.54, ODPS = 1.59, RDPS = 0.36, HIT = 3.34, CRIT = 1.35 },
+    ["ROGUE:ASSA"] = { STA = 0.01, STR = 0.55, AGI = 1.03, AP = 0.5, DPS = 4.22, ODPS = 2.08, HIT = 1.4, CRIT = 1.01 },
+    ["ROGUE:COMBAT"] = { STA = 0.01, STR = 0.55, AGI = 0.98, AP = 0.5, DPS = 5.19, ODPS = 1.48, HIT = 1.19, CRIT = 0.84 },
+    ["ROGUE:SUB"] = { STA = 0.01, STR = 0.55, AGI = 0.96, AP = 0.5, DPS = 5.24, ODPS = 1.14, HIT = 1.06, CRIT = 0.81 },
     ["PRIEST:DISC"] = { HEAL = 1, MP5 = 0.3, INT = 0.2, SPI = 0.12, CRIT = 0.59, SCRIT = 0.59 },
     ["PRIEST:HOLY"] = { HEAL = 1, MP5 = 0.6, INT = 0.32, SPI = 0.28, CRIT = 0.27, SCRIT = 0.27 },
     ["PRIEST:SHADOW"] = { SPELLDMG = 1, INT = 0.24, SPI = 0.01, HIT = 1.14, SHIT = 1.14, CRIT = 0.84, SCRIT = 0.84 },
-    ["PRIEST:SMITE"] = { SPELLDMG = 1, MP5 = 1.46, INT = 0.58, SPI = 0.57, HIT = 0.37, SHIT = 0.37, CRIT = 0.32, SCRIT = 0.32 },
     ["SHAMAN:ELE"] = { SPELLDMG = 1, MP5 = 0.04, INT = 0.19, SPI = 0.02, HIT = 1.18, SHIT = 1.18, CRIT = 0.61, SCRIT = 0.61 },
     ["SHAMAN:ENH"] = { SPELLDMG = 0.64, INT = 0.99, STR = 1.1, AGI = 0.66, AP = 0.5, DPS = 7.09, HIT = 2.6, CRIT = 1.21 },
     ["DRUID:BALANCE"] = { SPELLDMG = 1, MP5 = 0.07, INT = 0.24, HIT = 1.46, SHIT = 1.46, CRIT = 0.76, SCRIT = 0.76 },
     ["DRUID:CAT"] = { STR = 1.22, AGI = 1.34, AP = 0.5, FAP = 0.5, DPS = 4.39, HIT = 1.07, CRIT = 1.04 },
     ["DRUID:BEAR"] = { STA = 1, STR = 0.48, AGI = 0.43, AP = 0.22, FAP = 0.22, DPS = 3.08, HIT = 0.69, CRIT = 0.36, DEF = 0.87, DODGE = 0.11, ARMOR = 0.17 },
+    ["MAGE:ARCANE"] = { SPELLDMG = 1, MP5 = 0.31, INT = 0.81, SPI = 0.34, HIT = 1.49, SHIT = 1.49, CRIT = 0.63, SCRIT = 0.63 },
+    ["MAGE:FIRE"] = { SPELLDMG = 1, MP5 = 0.11, INT = 0.35, SPI = 0.06, HIT = 1.49, SHIT = 1.49, CRIT = 0.73, SCRIT = 0.73 },
+    ["MAGE:FROST"] = { SPELLDMG = 1, MP5 = 0.76, INT = 0.5, SPI = 0.3, HIT = 1.52, SHIT = 1.52, CRIT = 0.59, SCRIT = 0.59 },
+    ["MAGE:FFB"] = { SPELLDMG = 1, MP5 = 0.04, INT = 0.11, SPI = 0.1, HIT = 1.44, SHIT = 1.44, CRIT = 0.78, SCRIT = 0.78 },
+    ["WARLOCK:AFF"] = { SPELLDMG = 1, MP5 = 0.17, INT = 0.26, HIT = 0.7, SHIT = 0.7, CRIT = 0.67, SCRIT = 0.67 },
+    ["WARLOCK:DEMO"] = { SPELLDMG = 1, MP5 = 0.28, INT = 0.31, SPI = 0.07, HIT = 1.35, SHIT = 1.35, CRIT = 0.62, SCRIT = 0.62 },
+    ["WARLOCK:DESTRO"] = { SPELLDMG = 1, MP5 = 0.27, INT = 0.29, SPI = 0.11, HIT = 1.02, SHIT = 1.02, CRIT = 0.62, SCRIT = 0.62 },
+    ["WARLOCK:SMRUIN"] = { SPELLDMG = 1, MP5 = 0.25, INT = 0.31, SPI = 0.07, HIT = 0.97, SHIT = 0.97, CRIT = 0.77, SCRIT = 0.77 },
 }
+
+-- Specs that may be weighed the Loot Finder's own way instead (ForeverLootFinderDB.weightSource
+-- ["CLASS:SPEC"] = "CLASSIC"): the priest healers' wowsims set by hand, tanks' for threat.
+Rules.CLASSIC = { ["PRIEST:DISC"] = true, ["PRIEST:HOLY"] = true, ["WARRIOR:PROT"] = true, ["PALADIN:PROT"] = true }
 
 -- The spec chosen for another class in the window (this session); the
 -- player's own class: the character's (ForeverLootFinderChar.spec).
@@ -131,7 +147,7 @@ Rules.STAT_KEYS = {
     ITEM_MOD_DEFENSE_SKILL_RATING = "DEF", ITEM_MOD_DODGE_RATING = "DODGE", ITEM_MOD_PARRY_RATING = "PARRY",
     ITEM_MOD_BLOCK_RATING = "BLOCK", ITEM_MOD_BLOCK_VALUE = "BLOCKVAL",
     ITEM_MOD_EXTRA_ARMOR = "ARMOR", RESISTANCE0_NAME = "ARMOR",
-    ITEM_MOD_DAMAGE_PER_SECOND = "DPS",
+    ITEM_MOD_DAMAGE_PER_SECOND = "DPS",   -- off-hand and ranged weapons: ODPS, RDPS (Rules.HandDps)
     ITEM_MOD_FIRE_DAMAGE_DONE = "FIREDMG", ITEM_MOD_FROST_DAMAGE_DONE = "FROSTDMG",
     ITEM_MOD_SHADOW_DAMAGE_DONE = "SHADOWDMG", ITEM_MOD_NATURE_DAMAGE_DONE = "NATUREDMG",
     ITEM_MOD_ARCANE_DAMAGE_DONE = "ARCANEDMG", ITEM_MOD_HOLY_DAMAGE_DONE = "HOLYDMG",
@@ -170,22 +186,23 @@ Rules.PROFILES = {
         want = set({ "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "STA" }), exclude = set(MAGICAL),
     },
     MELEE = {
-        weights = { STR = 1, AGI = 1, AP = 0.5, HIT = 1.2, CRIT = 1, STA = 0.2, DPS = 3 },
+        weights = { STR = 1, AGI = 1, AP = 0.5, HIT = 1.2, CRIT = 1, STA = 0.2, DPS = 3, ODPS = 1 },
         -- Tank stats make it a tank's item, not a damage dealer's.
-        want = set({ "AP", "STR", "AGI", "HIT", "CRIT", "DPS" }),
+        want = set({ "AP", "STR", "AGI", "HIT", "CRIT", "DPS", "ODPS" }),
         exclude = set(MAGICAL, { "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL" }),
     },
     RANGED = {
         weights = { AGI = 1, RAP = 0.5, AP = 0.5, HIT = 1.2, RHIT = 1.2, CRIT = 1, RCRIT = 1, INT = 0.2, MP5 = 0.5,
-            STA = 0.2, DPS = 3 },
-        want = set({ "RAP", "AP", "AGI", "HIT", "RHIT", "CRIT", "RCRIT", "DPS" }),
+            STA = 0.2, RDPS = 3 },
+        want = set({ "RAP", "AP", "AGI", "HIT", "RHIT", "CRIT", "RCRIT", "RDPS" }),
         exclude = set({ "HEAL", "SPELLDMG", "SHIT", "SCRIT", "DEF", "PARRY", "BLOCK", "BLOCKVAL" }),
     },
 }
 
--- Per class: weights replace the role's, want/exclude entries switch on
--- (true) or off (false). Bears cannot parry or block and live on armour;
--- paladin and shaman damage and tank sets carry spell power.
+-- Per class: weights replace the role's (only where no spec has its own
+-- SPEC_WEIGHTS, or for Rules.CLASSIC), want/exclude entries switch on
+-- (true) or off (false). Bears cannot parry or block; paladin and shaman
+-- damage and tank sets carry spell power.
 -- Healing spirit in Forever: Meditation (priest) and Reflection (druid) keep 50% of the
 -- regeneration while casting; a point of spirit then gives about 0.31 (priest, spirit/4
 -- per tick) or 0.25 x 1.15 Living Spirit (druid, spirit/5) mana per 5 sec, at MP5's 2.5;
@@ -196,24 +213,21 @@ Rules.CLASS_PROFILES = {
     PRIEST = { HEAL = { weights = { SPI = 1.0, INT = 0.25 } } },
     DRUID = {
         HEAL = { weights = { SPI = 0.7, INT = 0.25 } },
-        TANK = { weights = { ARMOR = 0.25, AGI = 0.8, DEF = 0.6, PARRY = 0, BLOCK = 0, BLOCKVAL = 0, DPS = 0, FAP = 0.15 },
-            want = { AGI = true, PARRY = false, BLOCK = false, BLOCKVAL = false } },
-        MELEE = { weights = { STR = 1.2, FAP = 0.5, DPS = 0 }, want = { FAP = true, DPS = false } },
+        TANK = { want = { AGI = true, PARRY = false, BLOCK = false, BLOCKVAL = false } },
+        MELEE = { want = { FAP = true } },
     },
     PALADIN = {
         TANK = { weights = { SPELLDMG = 0.3, INT = 0.2, MP5 = 0.5 }, exclude = HYBRID, healingItemsOut = true },
-        MELEE = { weights = { SPELLDMG = 0.3, INT = 0.2, AGI = 0.6 }, exclude = HYBRID, healingItemsOut = true },
+        MELEE = { exclude = HYBRID, healingItemsOut = true },
         -- Illumination refunds a crit heal's mana: 1% crit is worth about 20 healing, Divine Intellect
         -- and ~30 int per 1% crit make intellect nearly a healing point (classic guides: int, crit before mp5).
         HEAL = { weights = { SPI = 0.1, INT = 0.9, CRIT = 1.2, SCRIT = 1.2 }, want = { SPI = false } },
     },
     SHAMAN = {
-        MELEE = { weights = { SPELLDMG = 0.3, INT = 0.2, MP5 = 0.5 }, exclude = HYBRID, healingItemsOut = true },
+        MELEE = { exclude = HYBRID, healingItemsOut = true },
         HEAL = { weights = { SPI = 0.1 }, want = { SPI = false } },
-        CASTER = { weights = { SPI = 0 } },
     },
-    WARLOCK = { CASTER = { weights = { STA = 0.4, SPI = 0 } } },
-    ROGUE = { MELEE = { weights = { STR = 0.5 }, noMana = true } },
+    ROGUE = { MELEE = { noMana = true } },
     WARRIOR = { MELEE = { noMana = true }, TANK = { noMana = true } },
     -- Melee hunters still cast from mana (wowsims weighs their intellect and mp5).
     HUNTER = { MELEE = { exclude = { MP5 = false } } },
@@ -264,9 +278,10 @@ function Rules.SpecProfile(class, id, plain)
         for k, v in pairs(b[f]) do p[f][k] = v end
         for k, v in pairs(o[f] or {}) do p[f][k] = v or nil end
     end
-    local sw = Rules.SPEC_WEIGHTS[key]
+    local sw = not Rules.IsClassic(class, id) and Rules.SPEC_WEIGHTS[key]
     if sw then
-        p.weights = {}
+        -- What the role weighs and the spec does not stays at 0, there to be weighed (options).
+        for k in pairs(p.weights) do p.weights[k] = 0 end
         for k, v in pairs(sw) do p.weights[k] = v end
     end
     defaults[key] = p
@@ -289,6 +304,21 @@ function Rules.SetWeight(class, id, stat, weight)
     end
     if not next(db.weights) then db.weights = nil end
     profiles, dynamics = {}, {}
+end
+
+-- Whether a spec is weighed the Loot Finder's own way (Rules.CLASSIC) instead of wowsims'.
+function Rules.IsClassic(class, id)
+    local key = tostring(class) .. ":" .. id
+    local db = ns.DB and ns.DB().weightSource
+    return Rules.CLASSIC[key] and db and db[key] == "CLASSIC" or false
+end
+
+function Rules.SetSource(class, id, classic)
+    local db = ns.DB()
+    db.weightSource = db.weightSource or {}
+    db.weightSource[tostring(class) .. ":" .. id] = classic and "CLASSIC" or nil
+    if not next(db.weightSource) then db.weightSource = nil end
+    profiles, defaults, dynamics = {}, {}, {}
 end
 
 -- Whether the player weighs the spec of this class and role differently.
@@ -419,7 +449,7 @@ end
 Rules.Dynamic = dynamic
 
 -- The weighable stats in the options' order.
-Rules.WEIGHT_KEYS = { "HEAL", "SPELLDMG", "MP5", "INT", "SPI", "STA", "STR", "AGI", "AP", "RAP", "FAP", "DPS",
+Rules.WEIGHT_KEYS = { "HEAL", "SPELLDMG", "MP5", "INT", "SPI", "STA", "STR", "AGI", "AP", "RAP", "FAP", "DPS", "ODPS", "RDPS",
     "HIT", "SHIT", "RHIT", "CRIT", "SCRIT", "RCRIT", "DEF", "DODGE", "PARRY", "BLOCK", "BLOCKVAL", "ARMOR" }
 
 -- Armour (item class 4) subclasses and weapons (item class 2).
@@ -573,6 +603,25 @@ function Rules.Stats(raw)
     -- Armour beyond the item's base ("+93 Armor"): shown for bear tanks.
     local bonus = raw and (raw.ITEM_MOD_EXTRA_ARMOR_SHORT or raw.ITEM_MOD_EXTRA_ARMOR)
     return stats, other, type(bonus) == "number" and bonus > 0 and bonus or nil
+end
+
+-- A weapon's DPS by hand (wowsims weighs them apart): a ranged weapon's is RDPS, an off-hand
+-- weapon's (or a one-hander's in the off hand) ODPS, the rest DPS. Changes stats in place.
+local RANGED_LOCS = { INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true, INVTYPE_THROWN = true }
+function Rules.HandDps(stats, equipLoc, offHand)
+    if not (stats and stats.DPS) then return stats end
+    local key = RANGED_LOCS[equipLoc] and "RDPS"
+        or (equipLoc == "INVTYPE_WEAPONOFFHAND" or offHand and equipLoc == "INVTYPE_WEAPON") and "ODPS"
+    if key then stats[key], stats.DPS = stats.DPS, nil end
+    return stats
+end
+
+-- The same stats with a one-hander's DPS as an off hand's (a copy; nil-safe).
+function Rules.AsOffHand(stats, equipLoc)
+    if not (stats and stats.DPS and equipLoc == "INVTYPE_WEAPON") then return stats end
+    local copy = {}
+    for k, v in pairs(stats) do copy[k] = v end
+    return Rules.HandDps(copy, equipLoc, true)
 end
 
 Rules.SCHOOL_OF = { FIREDMG = "FIRE", FROSTDMG = "FROST", SHADOWDMG = "SHADOW", NATUREDMG = "NATURE",

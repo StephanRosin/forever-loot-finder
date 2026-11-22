@@ -358,6 +358,14 @@ local function weightRows()
                 return list
             end,
             get = pickedSpec, set = function(v) picked.spec = v; Window.Refresh() end },
+        -- Priest healers and tanks: wowsims' set or the Loot Finder's own (Rules.CLASSIC).
+        { type = "select", label = "OPT_WEIGHTS_SOURCE",
+            choices = function()
+                return { { label = L.SOURCE_WOWSIMS, value = "WOWSIMS" }, { label = L.SOURCE_CLASSIC, value = "CLASSIC" } }
+            end,
+            get = function() return Rules.IsClassic(pickedClass(), pickedSpec()) and "CLASSIC" or "WOWSIMS" end,
+            set = function(v) Rules.SetSource(pickedClass(), pickedSpec(), v == "CLASSIC"); weightsChanged() end,
+            visible = function() return Rules.CLASSIC[pickedClass() .. ":" .. pickedSpec()] == true end },
     }
     for _, stat in ipairs(Rules.WEIGHT_KEYS) do
         local function default() return Rules.SpecProfile(pickedClass(), pickedSpec(), true).weights[stat] end

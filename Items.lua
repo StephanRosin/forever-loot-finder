@@ -135,6 +135,7 @@ function Items.Full(item)
     if name then
         item.name, item.link, item.quality, item.ilvl, item.reqLevel = name, link, quality, ilvl, reqLevel or 0
         item.stats, item.otherStats, item.bonusArmor = stats(link)
+        ns.Rules.HandDps(item.stats, item.equipLoc)
         item.onUse = ns.Rules.AddUse(item.id, item.stats)
         if ns.Rules.HasStats(item.stats) then
             item.effects = {}
@@ -198,7 +199,9 @@ function Items.Worn(invSlot)
     Items.Request(item)
     -- The worn link may carry an enchant: its stats as worn.
     if item and item.loaded then
-        local worn = setmetatable({ link = link, stats = (stats(link)) }, { __index = item })
+        -- A one-hander worn in the off hand (17) counts its DPS as an off hand's.
+        local worn = setmetatable({ link = link, stats = ns.Rules.HandDps((stats(link)), item.equipLoc, invSlot == 17) },
+            { __index = item })
         ns.Rules.AddUse(id, worn.stats)
         return worn
     end

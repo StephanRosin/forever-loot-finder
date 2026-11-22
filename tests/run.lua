@@ -446,7 +446,44 @@ do
     check("spec: not simulated keeps the role's (holy paladin)", Rules.Profile("PALADIN", "HEAL").weights.INT, 0.9)
     check("spec: melee hunters", Rules.CLASS_ROLES.HUNTER[2], "MELEE")
     check("spec: melee hunters keep mp5", Rules.ForRole("MELEE", { AGI = 10, MP5 = 4 }, "HUNTER"), true)
-    check("spec: a mage's is shown as its role", Rules.SpecLabelKey("MAGE", Rules.SpecOf("MAGE")), "ROLE_DPS")
+    check("spec: melee hunters are shown as the role", Rules.SpecLabelKey("HUNTER", Rules.SPECS.HUNTER[3]), "ROLE_MELEE_DPS")
+    -- Every spec weight belongs to a spec and a weighable stat, and sits on its role's scale.
+    local known, isKey = {}, {}
+    for class, specs in pairs(Rules.SPECS) do for _, sp in ipairs(specs) do known[class .. ":" .. sp.id] = sp.role end end
+    for _, k in ipairs(Rules.WEIGHT_KEYS) do isKey[k] = true end
+    local ANCHOR = { HEAL = { "HEAL", 1 }, CASTER = { "SPELLDMG", 1 }, MELEE = { "AP", 0.5 }, RANGED = { "AGI", 1 }, TANK = { "STA", 1 } }
+    local OWN_ANCHOR = { ["HUNTER:MELEE"] = { "AP", 0.7 }, ["PALADIN:PROT"] = { "SPELLDMG", 1 } }   -- AP with RAP; threat
+    local bad = {}
+    for key, w in pairs(Rules.SPEC_WEIGHTS) do
+        local role = known[key]
+        if not role then bad[#bad + 1] = key .. " no spec" else
+            local a = OWN_ANCHOR[key] or ANCHOR[role]
+            if w[a[1]] ~= a[2] then bad[#bad + 1] = key .. " scale" end
+        end
+        for stat in pairs(w) do if not isKey[stat] then bad[#bad + 1] = key .. " " .. stat end end
+    end
+    check("spec weights: all on a spec, its scale and our stats", table.concat(bad, ", "), "")
+    -- Priest healers and tanks: wowsims' or the Loot Finder's own.
+    check("source: wowsims by default", Rules.SpecProfile("PRIEST", "DISC").weights.SPI, 0.12)
+    Rules.SetSource("PRIEST", "DISC", true)
+    check("source: classic (Meditation)", Rules.SpecProfile("PRIEST", "DISC").weights.SPI, 1.0)
+    check("source: stored per spec", ns.DB().weightSource["PRIEST:DISC"], "CLASSIC")
+    Rules.SetSource("PRIEST", "DISC", false)
+    check("source: back", ns.DB().weightSource, nil)
+    Rules.SetSource("MAGE", "ARCANE", true)
+    check("source: only where offered", Rules.IsClassic("MAGE", "ARCANE"), false)
+    Rules.SetSource("MAGE", "ARCANE", false)
+    -- Not weighed by the spec: 0, there to be weighed.
+    check("spec: role's stats kept at 0 (stamina)", Rules.Profile("PRIEST", "HEAL").weights.STA, 0)
+    -- Hunters: generic attack power counts as ranged.
+    check("hunter: attack power counts", math.floor(Rules.Points("RANGED", { AP = 10 }, "HUNTER") * 100 + 0.5), 340)
+    -- Weapon DPS by hand.
+    check("hand dps: a bow's is ranged", Rules.HandDps({ DPS = 20 }, "INVTYPE_RANGED").RDPS, 20)
+    check("hand dps: an off-hand weapon's", Rules.HandDps({ DPS = 20 }, "INVTYPE_WEAPONOFFHAND").ODPS, 20)
+    check("hand dps: a one-hander's stays", Rules.HandDps({ DPS = 20 }, "INVTYPE_WEAPON").DPS, 20)
+    check("hand dps: in the off hand", Rules.AsOffHand({ DPS = 20 }, "INVTYPE_WEAPON").ODPS, 20)
+    Rules.Choose("WARRIOR", "ARMS")
+    check("arms: a bow's dps is worth nothing", Rules.Points("MELEE", { RDPS = 2 }, "WARRIOR"), 0)
     Settings.SetSpec("DISC")
 end
 check("priest's first role", next(Settings.Roles("PRIEST")), "HEAL")
@@ -737,7 +774,7 @@ check("weights page with Advanced", ns.Options.Current(), "weights")
 local page = _G.ForeverLootFinderPageweights
 local sliders = 0
 for _, row in ipairs(page.rows) do if row.slider then sliders = sliders + 1 end end
-check("weights page: the spec's stats only (disc priest: 6)", sliders, 6)
+check("weights page: the role's stats, those the spec leaves at 0 too (disc priest: 7)", sliders, 7)
 Settings.Set("advanced", false)
 -- HD themes are colours of their base: not in the theme menu.
 ns.Themes.Switch("TECH")
@@ -921,7 +958,7 @@ local tap = {}
 Rules.AddUse(18371, tap)
 check("Mindtap: not for damage casters (mana only, less intellect)", (Rules.ForRole("CASTER", tap, "PRIEST")), false)
 check("Mindtap: for healers", (Rules.ForRole("HEAL", tap, "PRIEST")), true)
-check("damage casters: no points for mp5 (mage, not simulated)", Rules.Points("CASTER", { MP5 = 10 }, "MAGE"), 0)
+check("arcane mage: mp5 as simulated", Rules.Points("CASTER", { MP5 = 10 }, "MAGE"), 3.1)
 check("elemental: mp5 as wowsims weighs it", Rules.Points("CASTER", { MP5 = 10 }, "SHAMAN"), 0.4)
 -- Own weights (options, Advanced).
 check("weights: default (disc, wowsims)", Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 1.2)
@@ -945,9 +982,9 @@ check("weights: all back", Rules.HasCustom("DRUID", "HEAL"), false)
 ns.DB().weights = { ["PRIEST:HEAL"] = { SPI = 9 } }
 check("weights: old role keys ignored", Rules.Points("HEAL", { SPI = 10 }, "PRIEST"), 1.2)
 Rules.ResetWeights()
-Rules.SetWeight("MAGE", "CASTER", "HIT", 3)
+Rules.SetWeight("MAGE", "ARCANE", "HIT", 3)
 Settings.Reset()
-check("weights: reset of all settings clears them", Rules.Points("CASTER", { HIT = 1 }, "MAGE"), 1.2)
+check("weights: reset of all settings clears them", Rules.Points("CASTER", { HIT = 1 }, "MAGE"), 1.49)
 M.items[18820] = item("Talisman of Ephemeral Power", 4, 66, 0, "INVTYPE_TRINKET", 4, 0, {})
 local tal = ns.Items.Get(18820)
 check("only a Use effect: now with points", tal.onUse and ns.Rules.HasStats(tal.stats), true)
@@ -986,9 +1023,9 @@ do
     check("dynamic: 2% hit counts in full", near(Rules.Points("CASTER", { HIT = 20 }, "MAGE", 60), 20 * B / 100 / 0.93 / 10), true)
     check("dynamic: hit over the cap is lost", near(Rules.Points("CASTER", { HIT = 100 }, "MAGE", 60), 60 * B / 100 / 0.93 / 10), true)
     check("dynamic: crit from damage", near(Rules.Points("CASTER", { SCRIT = 14 }, "MAGE"), B / 100 / 1.1), true)
-    check("dynamic: other classes keep fixed weights", Rules.Points("CASTER", { HIT = 10 }, "WARLOCK"), 12)
+    check("dynamic: other classes keep fixed weights", Rules.Points("CASTER", { HIT = 10 }, "WARLOCK"), 7)
     check("dynamic: room from worn and missing", Rules.HitRoom("CASTER", "MAGE", { { stats = { SHIT = 30 } } }), 90)
-    Rules.SetWeight("MAGE", "CASTER", "HIT", 2)
+    Rules.SetWeight("MAGE", "ARCANE", "HIT", 2)
     check("dynamic: own weight wins", Rules.Points("CASTER", { HIT = 10 }, "MAGE", 60), 20)
     Rules.ResetWeights()
     hitBonus = 16
@@ -1004,7 +1041,7 @@ do
     issecretvalue = nil
     ns.Settings.Set("dynamic", false)
     Rules.ReadChar()
-    check("dynamic off: fixed weights", Rules.Points("CASTER", { HIT = 20 }, "MAGE"), 24)
+    check("dynamic off: fixed weights", Rules.Points("CASTER", { HIT = 20 }, "MAGE"), 29.8)
     ns.Settings.Set("dynamic", nil)
     GetCombatRatingBonus, C_Spell, Rules.char, M.state.class = nil, nil, nil, "PRIEST"
     Rules.ReadChar()
