@@ -1,8 +1,8 @@
 # Forever Loot Finder
 
-A gear finder for WoW: Forever. Pick a class, one of its roles and an equipment slot, and the list shows every
+A gear finder for WoW: Forever. Pick a class, one of its specs and an equipment slot, and the list shows every
 dungeon and raid drop, world drop, dungeon quest reward (blue and better) and crafted item that suits them, sorted by
-points for the role (trinkets' Use effects counted at 75%; the weights can be changed per class and role
+points for the spec (trinkets' Use effects counted at 75%; the weights can be changed per class and spec
 under Options → Advanced), with where to get it. "Better than worn" compares each item with what you wear in that slot: **Upgrade**
 (more for the role, no less of its main stat) or **Alternative** (about as good, or a judgement call such as less
 healing but more spirit). A search button on every slot of the character window opens the list for that slot.
@@ -27,7 +27,9 @@ Nothing is copied: the tables are read while playing.
 - **DungeonJournal** (required): its dungeons' quests and their reward items, the dungeon entrances on the world
   map, the bosses' model ids.
 
-Roles are judged by item stats (`Rules.lua`); items without plain stats by their Use, Equip and Chance-on-hit
+Specs are judged by item stats (`Rules.lua`). Their default weights come from
+[wowsims](https://github.com/wowsims/forever) (MIT): its presets, or simulated with its sim where it has none
+(mages, warlocks, protection paladins); priest healers and tanks can use the Loot Finder's own instead. Items without plain stats are judged by their Use, Equip and Chance-on-hit
 texts (words per role, spell schools per class). Items the client does not know yet are left out until it does.
 
 ## Development
