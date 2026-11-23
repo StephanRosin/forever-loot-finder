@@ -981,6 +981,19 @@ end
 M.state.worn = { [16] = 210, [17] = 211 }
 check("staff vs mace + orb: both hands summed", Filter.Against(Rules.SLOT.MAINHAND, nil, "HEAL", "PRIEST", M.items[212]).stats.HEAL, 50)
 check("staff (45) vs mace + orb (50): no upgrade, an alternative", weapons()[212] and weapons()[212].verdict, "ALT")
+-- The same without a slot (the dungeon window: every slot of an instance) and with the bags.
+local function dungeonWeapons()
+    return ids(run({ class = "PRIEST", roles = { HEAL = true }, better = true, now = false, bags = true,
+        here = { name = "Molten Core", id = 409 } }))
+end
+check("dungeon list: staff vs mace + orb summed", dungeonWeapons()[212] and math.floor(dungeonWeapons()[212].delta + 0.5),
+    math.floor(Rules.Points("HEAL", { HEAL = 45 }, "PRIEST") - Rules.Points("HEAL", { HEAL = 50 }, "PRIEST") + 0.5))
+-- A one-hander beside a held off hand, the staff carried: one-handers are measured against one-handers.
+M.state.worn, M.state.carried = { [17] = 211 }, { 213 }
+check("dungeon list: a carried staff is no main hand for a one-hander", dungeonWeapons()[210] and dungeonWeapons()[210].verdict,
+    "UPGRADE")
+M.state.carried = nil
+M.state.worn = { [16] = 210, [17] = 211 }
 M.state.worn = { [16] = 213 }
 check("staff over a worn staff: upgrade", weapons()[212] and weapons()[212].verdict, "UPGRADE")
 check("mace beside a worn staff: only an alternative", weapons()[210] and weapons()[210].verdict, "ALT")

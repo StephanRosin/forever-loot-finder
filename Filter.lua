@@ -187,7 +187,7 @@ local function evaluate(item, o, slot)
         local wornList = owned(o, item, slot)
         -- A one-hander or off hand beside a worn two-hander: half a pair, at best an alternative.
         local halfPair = (slot.key == "MAINHAND" or slot.key == "OFFHAND") and item.equipLoc ~= "INVTYPE_2HWEAPON"
-            and (o.worn(Rules.SLOT.MAINHAND)[1] or {}).equipLoc == "INVTYPE_2HWEAPON"
+            and (wornOnly(o.worn(Rules.SLOT.MAINHAND))[1] or {}).equipLoc == "INVTYPE_2HWEAPON"
         for _, r in ipairs(entry.roles) do
             local wp, wm, wornUnclear = weakest(r.role, wornList, o.class)
             r.verdict = Filter.Verdict(r.points, r.main, wp, wm)
