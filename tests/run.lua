@@ -466,6 +466,31 @@ check("upgrades before alternatives", sorted, true)
 local none = true
 for _, e in ipairs(DU.List(false)) do none = none and e.verdict == "UPGRADE" end
 check("without alternatives: upgrades only", none, true)
+-- A boss dead in DungeonJournal's current run: its loot greyed, after the living ones'.
+check("no run log: nothing greyed", DU.Killed(), nil)
+local victim = list[1].drops[1].boss
+ForeverDungeonJournal_NS.RunLog = { Current = function() return { kills = { { b = victim:upper() }, { n = 999999 } } } end }
+list = DU.List(true)
+local greyed, order = 0, true
+for i, e in ipairs(list) do
+    if e.killed then greyed = greyed + 1 end
+    local alive = false
+    for _, d in ipairs(e.drops) do alive = alive or not d.killed end
+    if e.killed == alive then order = false end
+    if i > 1 and list[i - 1].verdict == e.verdict and list[i - 1].killed and not e.killed then order = false end
+end
+check("dead boss: its loot greyed", greyed > 0, true)
+local livingFirst = true
+for _, e in ipairs(list) do
+    for i = 2, #e.drops do if e.drops[i - 1].killed and not e.drops[i].killed then livingFirst = false end end
+end
+check("the living bosses named first", livingFirst, true)
+check("greyed only when every boss of it is dead, and after the living", order, true)
+ForeverDungeonJournal_NS.RunLog = { Current = function() return { closed = true, kills = { { b = victim } } } end }
+check("closed run: nothing greyed", (function() for _, e in ipairs(DU.List(true)) do if e.killed then return false end end return true end)(), true)
+ForeverDungeonJournal_NS.RunLog = { Current = function() error("changed") end }
+check("a changed run log greys nothing, breaks nothing", pcall(DU.List, true), true)
+ForeverDungeonJournal_NS.RunLog = nil
 M.state.instance = nil
 
 section("One role at a time")

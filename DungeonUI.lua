@@ -94,7 +94,7 @@ local function whereText(entry)
     local parts = { L["SLOT_" .. entry.slot.key] }
     local d = entry.drops[1]
     if d then
-        parts[#parts + 1] = d.boss
+        parts[#parts + 1] = d.killed and L.DUNGEON_KILLED:format(d.boss) or d.boss
         if d.chance then parts[#parts + 1] = percent(d.chance) end
     end
     local more = #entry.drops > 1 and ("  (+%d)"):format(#entry.drops - 1) or ""
@@ -118,7 +118,9 @@ local function rowTooltip(row)
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine(L.DUNGEON_TIP_DROPS, 1, 0.82, 0)
     for _, d in ipairs(e.drops) do
-        GameTooltip:AddDoubleLine(d.boss, d.chance and percent(d.chance) or "", 1, 1, 1, 0.7, 0.7, 0.7)
+        local c = d.killed and 0.5 or 1
+        GameTooltip:AddDoubleLine(d.killed and L.DUNGEON_KILLED:format(d.boss) or d.boss,
+            d.chance and percent(d.chance) or "", c, c, c, 0.7, 0.7, 0.7)
     end
     GameTooltip:AddLine(" ")
     if e.verdict == "UPGRADE" and e.delta then
@@ -189,6 +191,13 @@ local function fillRow(row, entry)
     U.paintText(row.delta, nil, entry.verdict == "UPGRADE" and UP_COLOR or ALT_COLOR)
     local card = ns.ThemeArt.CardColour()
     row.back:SetVertexColor(card[1], card[2], card[3], card[4])
+    -- Its boss is dead in this run: greyed, still there (another run, another chance).
+    row.icon:SetDesaturated(entry.killed == true)
+    row.name:SetAlpha(entry.killed and 0.45 or 1)
+    row.where:SetAlpha(entry.killed and 0.6 or 1)
+    row.delta:SetAlpha(entry.killed and 0.45 or 1)
+    row.iconFrame:SetAlpha(entry.killed and 0.4 or 1)
+    if entry.killed then U.paintText(row.delta, "muted") end
 end
 
 -- The list ----------------------------------------------------------------------
@@ -504,8 +513,11 @@ events:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 events:RegisterEvent("BAG_UPDATE_DELAYED")
 events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")   -- the loot tables load once combat is over
+events:RegisterEvent("BOSS_KILL")              -- a dead boss greys its loot (DungeonJournal logs it)
+events:RegisterEvent("ENCOUNTER_END")
 events:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then return arrive() end
+    if event == "BOSS_KILL" or event == "ENCOUNTER_END" then return C_Timer.After(1, DungeonUI.Refresh) end
     if event == "PLAYER_REGEN_ENABLED" then
         if loadWhy ~= "COMBAT" then return end
         loadWhy = nil
