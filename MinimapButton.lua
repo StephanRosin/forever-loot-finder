@@ -103,7 +103,9 @@ end
 
 function Button.Create()
     if Button.button or not Minimap then return end
-    local button = CreateFrame("Button", "ForeverLootFinderButton", Minimap)
+    -- The global name is what button collectors show for a button without
+    -- LibDBIcon (Leatrix Plus: its tooltip), hence readable (reported).
+    local button = CreateFrame("Button", "Forever Loot Finder", Minimap)
     button:SetSize(SIZE, SIZE)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)

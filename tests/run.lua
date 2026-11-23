@@ -834,7 +834,7 @@ local allowed = { ForeverLootFinderDB = true, ForeverLootFinderChar = true, SLAS
     SLASH_FOREVERLOOTFINDER2 = true, ForeverLootFinder_OnAddonCompartmentClick = true,
     ForeverLootFinder_OnAddonCompartmentEnter = true, ForeverLootFinder_OnAddonCompartmentLeave = true,
     LibForeverThemes = true, ForeverThemes = true, ForeverThemesHub = true, ForeverDungeonJournal_NS = true, ForeverLootFinderWindow = true, ForeverLootFinderSearch = true,
-    ForeverLootFinderButton = true, ForeverLootFinderOptions = true, ForeverLootFinderOptionsScroll = true,
+    ["Forever Loot Finder"] = true, ForeverLootFinderOptions = true, ForeverLootFinderOptionsScroll = true,
     ForeverLootFinderInterfacePanel = true, ForeverLootFinderInterfaceOpen = true }
 local stray = {}
 for k in pairs(_G) do
