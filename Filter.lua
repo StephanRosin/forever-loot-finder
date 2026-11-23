@@ -279,7 +279,9 @@ function Filter.Run(o)
                         and (not d.classOnly or tostring(d.classOnly):upper() == o.class)
                         and not (o.now and not canQuest(d))
                 else
-                    wanted = (d.raid and o.raids) or (not d.raid and o.dungeons)
+                    local pick = d.raid and o.pickRaids or not d.raid and o.pickDungeons
+                    wanted = ((d.raid and o.raids) or (not d.raid and o.dungeons))
+                        and not (pick and next(pick) and not pick[d.instance])
                 end
                 if wanted then drops[#drops + 1] = d end
             end
@@ -346,6 +348,7 @@ function Filter.Options(over)
         bags = true,   -- "better": against what is worn and what is carried in the bags
         -- Only the bosses of the dungeon or raid the player is in.
         here = S("filterHere") and ns.Source.Here() or nil,
+        pickDungeons = S("pickDungeons"), pickRaids = S("pickRaids"),
     }
     for k, v in pairs(over or {}) do o[k] = v end
     local invSlot = o.invSlot

@@ -28,6 +28,7 @@ Settings.DEFAULTS = {
     filterWorld = true,
     filterVendors = true,
     filterHere = false,         -- inside a dungeon or raid: only its bosses' loot
+    -- pickDungeons / pickRaids: { [instance name] = true }, chosen by right-click on the chip; none: all.
     filterBetter = false,       -- only better than (or alternatives to) what is worn
     filterAlternatives = true,  -- with "better": the unclear ones too
     sort = "POINTS",            -- Filter.SORTS

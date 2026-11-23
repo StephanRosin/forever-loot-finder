@@ -1160,6 +1160,21 @@ do
     ns.Settings.Set("filterHere", false)
     check("here: a wing counts for its instance", Source.IsHere({ boss = true, instance = "Dire Maul East" },
         { name = "Dire Maul", id = 429 }), true)
+    -- Picked instances (right-click on Dungeons / Raids): only those of that kind; none picked: all.
+    local function has(list, name) for _, n in ipairs(list) do if n == name then return true end end return false end
+    check("instances: dungeons", has(Source.Instances(false), "The Deadmines") and not has(Source.Instances(false), "Area2717"), true)
+    check("instances: raids", has(Source.Instances(true), "Area2717"), true)   -- the mock's raid has no name of its own
+    local function picks(over)
+        local o = { better = false, now = false }
+        for k, v in pairs(over) do o[k] = v end
+        local set = ids(run(o))
+        return (set[102] and "D" or "") .. (set[104] and "R" or "")   -- 102 only in the Deadmines, 104 only in the raid
+    end
+    check("picks: none, all", picks({}), "DR")
+    check("picks: another dungeon hides this one, raids stay", picks({ pickDungeons = { ["Nowhere"] = true } }), "R")
+    check("picks: this dungeon", picks({ pickDungeons = { ["The Deadmines"] = true } }), "DR")
+    check("picks: another raid", picks({ pickRaids = { ["Nowhere"] = true } }), "D")
+    check("picks: an empty set is all", picks({ pickRaids = {} }), "DR")
     check("here: not a longer name", Source.IsHere({ boss = true, instance = "Dire Maulers" },
         { name = "Dire Maul", id = 429 }), false)
     -- In a known wing: only its bosses' loot; a boss the journal does not know stays.

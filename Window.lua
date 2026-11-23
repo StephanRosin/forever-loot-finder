@@ -261,6 +261,94 @@ local function filterRow()
     flow(frame.filterChips, frame, PAD + LABEL_W, rowY(3))
 end
 
+-- The pick menu of the Dungeons / Raids chip (right-click): its instances, several at once;
+-- none picked: all of them. Columns of PICK_ROWS; built anew on each opening (the list loads late).
+local PICK_ROWS, PICK_W, PICK_H = 16, 190, 20
+
+local function picked(key) return S(key) or {} end
+
+local function setPick(key, name, on)
+    local set = {}
+    for k in pairs(picked(key)) do set[k] = true end
+    set[name] = on or nil
+    Settings.Set(key, next(set) and set or nil)
+end
+
+local function pickButton(menu, i)
+    local b = menu.buttons[i]
+    if b then return b end
+    b = CreateFrame("Button", nil, menu)
+    b:SetSize(PICK_W - 8, PICK_H)
+    b.tick = b:CreateTexture(nil, "ARTWORK")
+    b.tick:SetSize(16, 16)
+    b.tick:SetPoint("LEFT", b, "LEFT", 2, 0)
+    b.tick:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+    b.text = Text(b, 12, "text", false)
+    b.text:SetPoint("LEFT", b, "LEFT", 20, 0)
+    b.text:SetPoint("RIGHT", b, "RIGHT", -4, 0)
+    b.text:SetJustifyH("LEFT")
+    b.text:SetWordWrap(false)
+    b.hover = fill(b, "HIGHLIGHT")
+    b.hover:SetAllPoints()
+    b.hover:SetVertexColor(1, 1, 1, 0.08)
+    menu.buttons[i] = b
+    return b
+end
+
+local function buildPickMenu()
+    local menu = CreateFrame("Frame", nil, frame)
+    menu:SetFrameStrata("DIALOG")
+    menu.back = fill(menu, "BACKGROUND")
+    menu.back:SetAllPoints()
+    menu.back:SetVertexColor(0.05, 0.05, 0.06, 0.97)
+    menu.edges = edges(menu)
+    menu.buttons = {}
+    menu:Hide()
+    return menu
+end
+
+-- Fills and opens the menu under chip for key (pickDungeons / pickRaids); the first row: all.
+local function openPicks(chip, key, raid, enable)
+    local menu = frame.pickMenu
+    if menu:IsShown() and menu.key == key then menu:Hide() return end
+    menu.key = key
+    local names = ns.Source.Instances(raid)
+    local rows = { { label = L.PICK_ALL, all = true } }
+    for _, name in ipairs(names) do rows[#rows + 1] = { label = name, name = name } end
+    local function paint()
+        local set = picked(key)
+        for i, r in ipairs(rows) do
+            local b = menu.buttons[i]
+            local on = r.all and next(set) == nil or set[r.name] == true
+            b.tick:SetShown(on)
+            paintText(b.text, on and "text" or "muted")
+        end
+    end
+    for i, r in ipairs(rows) do
+        local b = pickButton(menu, i)
+        local col, row = math.floor((i - 1) / PICK_ROWS), (i - 1) % PICK_ROWS
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", menu, "TOPLEFT", 4 + col * PICK_W, -4 - row * PICK_H)
+        b.text:SetText(r.label)
+        b:SetScript("OnClick", function()
+            if r.all then Settings.Set(key, nil) else setPick(key, r.name, not picked(key)[r.name]) end
+            if not S(enable) then Settings.Set(enable, true) end   -- a pick wants its kind shown
+            paint()
+            chip:Relabel()
+            Window.Relayout()
+        end)
+        b:Show()
+    end
+    for i = #rows + 1, #menu.buttons do menu.buttons[i]:Hide() end
+    local cols = math.ceil(#rows / PICK_ROWS)
+    menu:SetSize(cols * PICK_W, math.min(#rows, PICK_ROWS) * PICK_H + 8)
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", chip, "BOTTOMLEFT", 0, -2)
+    paintEdges(menu.edges, colour("accent"), 0.8)
+    paint()
+    menu:Show()
+end
+
 -- A spec chip picks its spec; the picked one stays (one at a time).
 -- Tanks wear their heaviest armour: choosing a tank spec turns the filter on
 -- (it can be turned off again).
@@ -783,6 +871,35 @@ local function build()
     frame.sourceChips = chipsOf({ { "filterDungeons", "FILTER_DUNGEONS" }, { "filterRaids", "FILTER_RAIDS" },
         { "filterQuests", "FILTER_QUESTS" }, { "filterCrafting", "FILTER_CRAFTING" }, { "filterWorld", "FILTER_WORLD" },
         { "filterVendors", "FILTER_VENDORS" } })
+    -- Dungeons and Raids: right-click picks instances (the count on the chip, the names in its tooltip).
+    frame.pickMenu = buildPickMenu()
+    for i, p in ipairs({ { "pickDungeons", false, "filterDungeons", "FILTER_DUNGEONS" },
+            { "pickRaids", true, "filterRaids", "FILTER_RAIDS" } }) do
+        local chip, key, raid, enable, label = frame.sourceChips[i], p[1], p[2], p[3], p[4]
+        chip.label = function()
+            local n = 0
+            for _ in pairs(picked(key)) do n = n + 1 end
+            return n > 0 and L.PICK_COUNT:format(L[label], n) or L[label]
+        end
+        chip:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        chip:SetScript("OnClick", function(self, button)
+            if button == "RightButton" then return openPicks(self, key, raid, enable) end
+            Settings.Set(enable, not S(enable))
+            Window.Update()
+        end)
+        chip:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+            GameTooltip:SetText(L[label])
+            local names = {}
+            for name in pairs(picked(key)) do names[#names + 1] = name end
+            table.sort(names)
+            for _, name in ipairs(names) do GameTooltip:AddLine(name, 1, 1, 1) end
+            GameTooltip:AddLine(L.PICK_HINT, 0.6, 0.6, 0.6)
+            GameTooltip:Show()
+        end)
+        chip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        chip:Relabel()
+    end
     -- Inside a dungeon or raid: its name on the chip.
     local get, set = setting("filterHere")
     frame.hereChip = Chip(body, function() return L.FILTER_HERE:format(ns.Source.PlaceName(ns.Source.Here())) end, get, set)
@@ -840,7 +957,7 @@ local function build()
     frame.footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", PAD, 8)
     frame.footer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PAD, 8)
 
-    frame:SetScript("OnHide", function() frame.classMenu:Hide() end)
+    frame:SetScript("OnHide", function() frame.classMenu:Hide() frame.pickMenu:Hide() end)
     frame:Hide()
     if UISpecialFrames then table.insert(UISpecialFrames, "ForeverLootFinderWindow") end
     Window.Restyle()

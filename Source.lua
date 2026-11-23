@@ -478,6 +478,20 @@ function Source.IsHere(d, here)
     local keys = here.wing and journalKeysByNpc and d.npcID and journalKeysByNpc[d.npcID]
     return not keys or keys[here.wing] == true
 end
+-- The dungeons (raid false) or raids with boss loot, by name, sorted (the window's pick menu).
+function Source.Instances(raid)
+    local seen, out = {}, {}
+    for _, d in ipairs(drops or {}) do
+        local name = d.instance
+        if d.boss and not d.quest and (d.raid or false) == raid and name and name ~= "" and not seen[name] then
+            seen[name] = true
+            out[#out + 1] = name
+        end
+    end
+    table.sort(out)
+    return out
+end
+
 function Source.ByItem(id) return byItem and byItem[id] or {} end
 function Source.Name() return sourceName end
 
