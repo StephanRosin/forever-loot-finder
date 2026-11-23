@@ -46,6 +46,7 @@ local texts = {}   -- every font string: { fs, size, kind } (restyled with the t
 -- ---------------------------------------------------------------------------
 local function colour(kind)
     if kind == "accent" then return ns.Themes.Accent() end
+    if kind == "heading" then return ns.Themes.TitleColor() end
     local c = ns.Themes.TextColor()
     if kind == "muted" then return { c[1], c[2], c[3], 0.62 } end
     return c
@@ -113,13 +114,13 @@ end
 
 local function styleText(t)
     local name, add = ns.Themes.BodyFont()
-    if t.kind == "title" then name, add = ns.Themes.TitleFont(), 0 end
+    if t.kind == "title" or t.kind == "heading" then name, add = ns.Themes.TitleFont(), 0 end
     setFont(t.fs, ns.Media.FontPath(name), t.size + (add or 0), ns.Themes.Outline())
     t.fs:SetShadowOffset(ns.Themes.Outline() == "" and 1 or 0, ns.Themes.Outline() == "" and -1 or 0)
     if t.paint ~= false then paintText(t.fs, t.kind) end
 end
 
--- kind: text, muted, accent, title; paint false: the caller colours it.
+-- kind: text, muted, accent, title, heading (a window's title: gold under Classic); paint false: the caller colours it.
 local function Text(parent, size, kind, paint)
     local fs = parent:CreateFontString(nil, "OVERLAY")
     local t = { fs = fs, size = size, kind = kind or "text", paint = paint }
@@ -785,7 +786,7 @@ local function build()
     bar:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
     frame.bar = bar
     ns.ThemeArt.BuildWindow(frame, bar)
-    frame.title = Text(bar, 16, "title")
+    frame.title = Text(bar, 17, "heading")
     frame.title:SetText(L.ADDON_NAME)
     bar.close = closeButton(bar)
     frame.gear = CreateFrame("Button", nil, bar)

@@ -361,7 +361,7 @@ local function build()
     frame.fold:ClearAllPoints()
     frame.fold:SetPoint("RIGHT", frame.close, "LEFT", 0, 0)
     tip(frame.fold, L.DUNGEON_FOLD, L.DUNGEON_FOLD_TIP)
-    frame.title = U.Text(frame.bar, 13, "title")
+    frame.title = U.Text(frame.bar, 13, "heading")
 
     frame.specs = {}
     for i = 1, MAX_SPECS do

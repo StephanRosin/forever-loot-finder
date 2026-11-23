@@ -227,7 +227,7 @@ function UnitFactionGroup() return "Alliance" end
 function GetCursorPosition() return 0, 0 end
 function GetMinimapShape() return "ROUND" end
 RAID_CLASS_COLORS = { PRIEST = { r = 1, g = 1, b = 1 }, WARRIOR = { r = 0.78, g = 0.61, b = 0.43 } }
-Enum = { ItemClass = { Armor = 4, Weapon = 2 } }
+Enum = { ItemClass = { Armor = 4, Weapon = 2 }, UITextureSliceMode = { Stretched = 0, Tiled = 1 } }
 
 -- Items: id -> { name, quality, ilvl, reqLevel, equipLoc, classID, subClassID, stats }.
 M.items = {}

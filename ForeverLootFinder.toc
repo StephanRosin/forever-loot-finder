@@ -20,6 +20,8 @@ Locale.lua
 Media.lua
 Options\Style.lua
 Themes.lua
+Corners.lua
+Border.lua
 ThemeArt.lua
 Rules.lua
 Items.lua

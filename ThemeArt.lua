@@ -4,8 +4,10 @@ local ADDON, ns = ...
 ThemeArt.lua -- a window under a theme (the Data Bar's gold window): the
 theme's backdrop with the theme's background colour over it, the rim on
 every side, the title bar's colour and Pitwall's wedge in it, a framed
-theme's frame around the rim and its banner as the title bar; under Classic
-the options window's flat look.
+theme's frame around the rim and its banner as the title bar. Under Classic
+the family's window (Forever Group Finder's, Combat Meter's FOREVER style):
+dark body with rounded corners, the gold ring and soft shadow (Border.lua),
+a gold shine up the title bar and a gold line under it.
 -----------------------------------------------------------------------------]]
 local ThemeArt = {}
 ns.ThemeArt = ThemeArt
@@ -26,7 +28,18 @@ function ThemeArt.BuildWindow(frame, titleBar)
     titleBar.ends = {}
     for i = 1, 2 do titleBar.ends[i] = titleBar:CreateTexture(nil, "BACKGROUND") end
     titleBar.wedge = titleBar:CreateTexture(nil, "OVERLAY", nil, 6)
+    titleBar.line = titleBar:CreateTexture(nil, "ARTWORK")
+    titleBar.line:SetHeight(1)
+    titleBar.line:SetPoint("BOTTOMLEFT")
+    titleBar.line:SetPoint("BOTTOMRIGHT")
+    frame.clip = {}
 end
+
+-- Classic's window (Forever Group Finder's defaults).
+local CLASSIC = {
+    bg = { 0.047, 0.047, 0.055, 1 }, radius = 10, shadowSize = 9, shadowAlpha = 0.65,
+    shine = { 1, 0.79, 0.19, 0.10 }, line = { 0.78, 0.59, 0.13, 0.45 },
+}
 
 local function paintBack(back, art)
     if not art.back then
@@ -157,19 +170,34 @@ end
 
 function ThemeArt.StyleWindow(frame, titleBar)
     local art = ns.Themes.Art()
-    if not art then
-        local C = ns.Style.COLORS
+    local classic = art == nil
+    -- Classic's ring and shadow; a theme has its own rim (nothing drawn: style NONE, no shadow).
+    ns.Border.Draw(frame, frame, { style = classic and "GOLD" or "NONE", size = 1, color = { 0, 0, 0, 1 },
+        radius = classic and CLASSIC.radius or 0, shadow = classic, shadowSize = CLASSIC.shadowSize,
+        shadowAlpha = CLASSIC.shadowAlpha })
+    ns.Corners.Fit(frame.clip, frame, classic and ns.Corners.Clamp(CLASSIC.radius, frame:GetSize()) or 0,
+        { frame.bodyFill, titleBar.fill })
+    titleBar.line:SetShown(classic)
+    if classic then
         frame.themeBack:Hide()
-        frame.bodyFill:SetColorTexture(unpack(C.bg))
-        paintRims(frame.rims, frame, C.border, 1)
+        frame.bodyFill:SetColorTexture(unpack(CLASSIC.bg))
+        for _, r in ipairs(frame.rims) do r:Hide() end
         paintFrame(frame.frameStrips, frame, {})
         paintBanner(titleBar, {})
         titleBar.fill:ClearAllPoints()
         titleBar.fill:SetAllPoints(titleBar)
-        titleBar.fill:SetColorTexture(unpack(C.panel))
+        local s = CLASSIC.shine
+        titleBar.fill:SetColorTexture(1, 1, 1, 1)
+        titleBar.fill:SetGradient("VERTICAL", CreateColor(s[1], s[2], s[3], 0), CreateColor(s[1], s[2], s[3], s[4]))
         titleBar.fill:Show()
+        titleBar.line:SetColorTexture(unpack(CLASSIC.line))
         titleBar.wedge:Hide()
         return
+    end
+    for _, r in ipairs(frame.rims) do r:Show() end
+    -- A colour texture after the gradient: no gradient left over.
+    if titleBar.fill.SetGradient then
+        titleBar.fill:SetGradient("VERTICAL", CreateColor(1, 1, 1, 1), CreateColor(1, 1, 1, 1))
     end
     paintBack(frame.themeBack, art)
     local bg = art.bg

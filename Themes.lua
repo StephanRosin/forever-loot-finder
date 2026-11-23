@@ -76,10 +76,18 @@ function Themes.Tint(art) return Lib.Tint(art, Themes.Current(), Themes.Color())
 function Themes.Rim(art) return Lib.Rim(Themes.Current(), Themes.Color()) or art.rim end
 function Themes.WedgeColor(art) return Lib.WedgeColor(art, Themes.Current(), Themes.Color()) end
 
--- The accent: the colour's, else the theme's own, else the options' blue (Classic).
+-- Classic's gold: titles and accent, as every Forever addon's window under Classic.
+Themes.CLASSIC_GOLD = { 1, 0.82, 0.29, 1 }
+
+-- The accent: the colour's, else the theme's own, else Classic's gold.
 function Themes.Accent()
     local art = Themes.Art()
-    return Lib.Accent(Themes.Current(), Themes.Color()) or art and art.accent or ns.Style.COLORS.accent
+    return Lib.Accent(Themes.Current(), Themes.Color()) or art and art.accent or Themes.CLASSIC_GOLD
+end
+
+-- A window title's colour: Classic's gold, else the theme's text colour.
+function Themes.TitleColor()
+    return Themes.Art() and Themes.TextColor() or Themes.CLASSIC_GOLD
 end
 
 -- Fonts: the display face for headings, the body face for the rest (the

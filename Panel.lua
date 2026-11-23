@@ -38,7 +38,7 @@ local function build(parent)
     bar:SetPoint("TOPRIGHT")
     panel.bar = bar
     ns.ThemeArt.BuildWindow(panel, bar)
-    panel.title = UI.Text(bar, 15, "title")
+    panel.title = UI.Text(bar, 15, "heading")
     panel.title:SetPoint("RIGHT", bar, "RIGHT", -TITLE_H, 0)
     bar.close = UI.closeButton(bar, function() if panel.onClose then panel.onClose() end end)
 
