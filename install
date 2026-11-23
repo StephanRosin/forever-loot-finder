@@ -21,6 +21,8 @@ cp -r "$HERE/Libs/LibForeverThemes/Media" "$TARGET/Libs/LibForeverThemes/"
 # The rendered profession loops (built from art/ by art/pack.py).
 mkdir -p "$TARGET/Media"
 cp -r "$HERE/Media/Professions" "$TARGET/Media/"
+# Classic's window: ring, shadow and corner masks (Border.lua, Corners.lua).
+cp -r "$HERE/Media/Frame" "$TARGET/Media/"
 # The sort icon (Forever Quest Log's own drawing).
 cp "$HERE/Media/IconSort.tga" "$TARGET/Media/"
 echo "Installed to $TARGET"
