@@ -455,7 +455,7 @@ function DungeonUI.Refresh()
     local up = 0
     for _, e in ipairs(entries) do if e.verdict == "UPGRADE" then up = up + 1 end end
 
-    frame.title:SetText(here and L.DUNGEON_TITLE:format(here.name) or L.DUNGEON_TITLE_OUT)
+    frame.title:SetText(here and L.DUNGEON_TITLE:format(ns.Source.PlaceName(here)) or L.DUNGEON_TITLE_OUT)
     -- Minimised, the title still tells how many upgrades wait here.
     if folded() and up > 0 then frame.title:SetText(frame.title:GetText() .. ("  (%d)"):format(up)) end
     frame.list.message:SetText(message(here, entries))
@@ -543,12 +543,12 @@ events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")   -- the loot tables load once combat is over
 events:RegisterEvent("BOSS_KILL")              -- a dead boss greys its loot (DungeonJournal logs it)
 events:RegisterEvent("ENCOUNTER_END")
+events:RegisterEvent("ZONE_CHANGED")           -- another room: maybe another wing (Stratholme's two sides)
+events:RegisterEvent("ZONE_CHANGED_INDOORS")
 events:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then return arrive() end
     if event == "BOSS_KILL" or event == "ENCOUNTER_END" then return C_Timer.After(1, DungeonUI.Refresh) end
-    if event == "PLAYER_REGEN_ENABLED" then
-        if loadWhy ~= "COMBAT" then return end
-        loadWhy = nil
-    end
+    -- After a fight: the tables may load now, and the journal may have learnt the wing from the kills.
+    if event == "PLAYER_REGEN_ENABLED" and loadWhy == "COMBAT" then loadWhy = nil end
     DungeonUI.Refresh()
 end)

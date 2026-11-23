@@ -785,7 +785,7 @@ local function build()
         { "filterVendors", "FILTER_VENDORS" } })
     -- Inside a dungeon or raid: its name on the chip.
     local get, set = setting("filterHere")
-    frame.hereChip = Chip(body, function() return L.FILTER_HERE:format((ns.Source.Here() or {}).name or "") end, get, set)
+    frame.hereChip = Chip(body, function() return L.FILTER_HERE:format(ns.Source.PlaceName(ns.Source.Here())) end, get, set)
     frame.sourceChips[#frame.sourceChips + 1] = frame.hereChip
     frame.filterChips = chipsOf({ { "filterNow", "FILTER_NOW" }, { "filterBestArmor", "FILTER_BEST_ARMOR" },
         { "filterBetter", "FILTER_BETTER" }, { "filterAlternatives", "FILTER_ALTERNATIVES" },

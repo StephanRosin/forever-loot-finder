@@ -95,7 +95,12 @@ ForeverDungeonJournal_NS = {
             { name = "Red Silk Bandanas", id = 214, requires = 17, pickup = "Scout Riell", faction = "Alliance", rewardChoice = true,
                 rewardItems = { { 130, "Quest Robe", 3 }, { 131, "Green Thing", 2 } } },
             { name = "Horde Only", faction = "Horde", rewardItems = { { 132, "Horde Ring", 3 } } },
-        } } },
+        } },
+        -- Wings of one instance (Dire Maul 429), told apart by the journal.
+        ["Dire Maul: East"] = { bosses = { { name = "Alzzin the Wildshaper", npcID = 11492 } } },
+        ["Dire Maul: West"] = { bosses = { { name = "Prince Tortheldrin", npcID = 11486 } } },
+        ["Lower Blackrock Spire"] = { bosses = { { name = "Overlord Wyrmthalak", npcID = 9568 } } },
+    },
     STATIC_DISPLAY_IDS = { [1] = 555 },
 }
 
@@ -1144,6 +1149,39 @@ do
         { name = "Dire Maul", id = 429 }), true)
     check("here: not a longer name", Source.IsHere({ boss = true, instance = "Dire Maulers" },
         { name = "Dire Maul", id = 429 }), false)
+    -- In a known wing: only its bosses' loot; a boss the journal does not know stays.
+    local east = { name = "Dire Maul", id = 429, wing = "Dire Maul: East" }
+    check("wing: its own boss", Source.IsHere({ boss = "Alzzin", instance = "Dire Maul East", npcID = 11492 }, east), true)
+    check("wing: not the other wing's boss",
+        Source.IsHere({ boss = "Tortheldrin", instance = "Dire Maul West", npcID = 11486 }, east), false)
+    check("wing: a boss the journal does not know stays",
+        Source.IsHere({ boss = "Trash", instance = "Dire Maul West", npcID = 77 }, east), true)
+    check("wing unknown: every wing", Source.IsHere({ boss = "Tortheldrin", instance = "Dire Maul West", npcID = 11486 },
+        { name = "Dire Maul", id = 429 }), true)
+    local FDJ = ForeverDungeonJournal_NS
+    M.state.instance = { name = "Dire Maul", kind = "party", id = 429 }
+    check("no run, no detection: no wing", Source.Here().wing, nil)
+    FDJ.CurrentDungeon = function() return "Dire Maul: West" end
+    check("the journal's detection", Source.Here().wing, "Dire Maul: West")
+    FDJ.RunLog = { Current = function() return { map = 429, dungeon = "Dire Maul: East" } end }
+    check("the run log's wing first (learnt from kills)", Source.Here().wing, "Dire Maul: East")
+    FDJ.RunLog = { Current = function() return { map = 36, dungeon = "Dire Maul: East" } end }
+    check("another instance's run: not used", Source.Here().wing, "Dire Maul: West")
+    FDJ.CurrentDungeon = function() return "Lower Blackrock Spire" end
+    M.state.instance = { name = "Blackrock Spire", kind = "party", id = 229 }
+    check("Spire: the shared entrance proves no wing", Source.Here().wing, nil)
+    FDJ.CurrentDungeon = function() error("changed") end
+    M.state.instance = { name = "Dire Maul", kind = "party", id = 429 }
+    check("a changed journal: no wing, no error", Source.Here().wing, nil)
+    M.state.instance = { name = "The Deadmines", kind = "party", id = 36 }
+    FDJ.CurrentDungeon = function() return "The Deadmines" end
+    check("no wings there: none asked", Source.Here().wing, nil)
+    FDJ.CurrentDungeon, FDJ.RunLog, M.state.instance = nil, nil, nil
+    check("title: instance and wing", Source.PlaceName(east), "Dire Maul – " .. ns.L.WINGS["Dire Maul: East"])
+    check("title: no wing known", Source.PlaceName({ name = "Dire Maul", id = 429 }), "Dire Maul")
+    check("every wing has a label", (function()
+        for key in pairs(FDJ.DB) do if key:find(": ") and not ns.L.WINGS[key] then return key end end
+        return true end)(), true)
 end
 
 -- The shopping list: per character, counted from the bags, origin from the loot tables.

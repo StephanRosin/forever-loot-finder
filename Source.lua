@@ -19,7 +19,7 @@ classOnly, journal }; Source.ByItem(id) the drops of one item.
 local Source = {}
 ns.Source = Source
 
-local drops, byItem, sourceName, journalByNpc
+local drops, byItem, sourceName, journalByNpc, journalKeysByNpc
 local MODULE, CORE = "AtlasLootClassic_DungeonsAndRaids", "AtlasLootClassic"
 local CRAFT_MODULE = "AtlasLootClassic_Crafting"
 local WORLD_MODULE, WORLD_TABLE = "AtlasLootClassic_Collections", "WorldEpics"
@@ -264,15 +264,19 @@ function Source.ReadJournal(fdj)
     return list
 end
 
--- The journal's dungeon of each boss by npc id.
+-- The journal's dungeon of each boss by npc id, and every dungeon it is in (a set).
 local function indexBosses(fdj)
-    local index = {}
+    local index, all = {}, {}
     for key, dungeon in pairs(fdj and fdj.DB or {}) do
         for _, boss in ipairs(type(dungeon) == "table" and type(dungeon.bosses) == "table" and dungeon.bosses or {}) do
-            if type(boss) == "table" and boss.npcID then index[boss.npcID] = key end
+            if type(boss) == "table" and boss.npcID then
+                index[boss.npcID] = key
+                all[boss.npcID] = all[boss.npcID] or {}
+                all[boss.npcID][key] = true
+            end
         end
     end
-    return index
+    return index, all
 end
 
 -- The other quests' blue and purple rewards (QuestRewards.lua, Wowhead), not those the
@@ -390,7 +394,8 @@ function Source.Load()
         table.insert(index[d.item], d)
     end
     if drops then return true end -- a direct Source.Load finished first
-    drops, byItem, sourceName, journalByNpc = list, index, table.concat(names, " + "), indexBosses(fdj)
+    drops, byItem, sourceName = list, index, table.concat(names, " + ")
+    journalByNpc, journalKeysByNpc = indexBosses(fdj)
     return true
 end
 
@@ -424,24 +429,57 @@ end
 
 function Source.Drops() return drops or {} end
 
--- The dungeon or raid the player is in, { name, id }; nil outside.
+-- Instances whose wings the game does not tell apart (one id each): Scarlet Monastery,
+-- Blackrock Spire, Stratholme, Dire Maul.
+local WINGS = { [189] = true, [229] = true, [329] = true, [429] = true }
+
+-- The wing the player is in, as the journal names it ("Dire Maul: East"), nil when it
+-- does not know. Its run log first: it learns the wing from the creatures killed (any
+-- language); then its own detection (instance, room or map name). Blackrock Spire's
+-- two routes share an entrance: only the run log tells them apart.
+local function wingHere(id)
+    local fdj = journal()
+    if not (fdj and WINGS[id]) then return nil end
+    local key
+    local ok, run = pcall(function() return fdj.RunLog and fdj.RunLog.Current and fdj.RunLog.Current() end)
+    if ok and type(run) == "table" and not run.closed and tonumber(run.map) == id then key = run.dungeon end
+    if not key and id ~= 229 and fdj.CurrentDungeon then
+        local found
+        ok, found = pcall(fdj.CurrentDungeon)
+        key = ok and found or nil
+    end
+    return type(key) == "string" and type(fdj.DB[key]) == "table" and key or nil
+end
+
+-- The dungeon or raid the player is in, { name, id, wing }; nil outside.
 function Source.Here()
     local name, kind, _, _, _, _, _, id = GetInstanceInfo()
     if kind ~= "party" and kind ~= "raid" then return nil end
-    return { name = name, id = id }
+    return { name = name, id = id, wing = wingHere(id) }
+end
+
+-- The place's name for titles: the instance, and its wing where known ("Dire Maul – East").
+function Source.PlaceName(here)
+    if not here then return "" end
+    local wing = here.wing and ns.L.WINGS and ns.L.WINGS[here.wing]
+    return wing and (here.name .. " – " .. wing) or here.name
 end
 
 -- Whether a boss drop is from there: AtlasLoot's InstanceID, else the name
 -- (both in the client's language); a wing ("Dire Maul East") counts for its
--- instance ("Dire Maul"), which the game does not tell apart.
+-- instance ("Dire Maul"). In a known wing only its bosses' loot (the journal's
+-- dungeon of the boss); a boss the journal does not know stays.
 function Source.IsHere(d, here)
     if not (d.boss and here) then return false end
-    if d.instanceID and d.instanceID == here.id then return true end
     local name = d.instance
-    return name ~= nil and (name == here.name or name:sub(1, #here.name + 1) == here.name .. " ")
+    local inside = (d.instanceID and d.instanceID == here.id)
+        or (name ~= nil and (name == here.name or name:sub(1, #here.name + 1) == here.name .. " "))
+    if not inside then return false end
+    local keys = here.wing and journalKeysByNpc and d.npcID and journalKeysByNpc[d.npcID]
+    return not keys or keys[here.wing] == true
 end
 function Source.ByItem(id) return byItem and byItem[id] or {} end
 function Source.Name() return sourceName end
 
 -- Forgets the drops (the tests).
-function Source.Reset() drops, byItem, sourceName, journalByNpc = nil, nil, nil, nil end
+function Source.Reset() drops, byItem, sourceName, journalByNpc, journalKeysByNpc = nil, nil, nil, nil, nil end

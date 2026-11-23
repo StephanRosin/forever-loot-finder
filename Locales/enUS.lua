@@ -440,3 +440,10 @@ L.DUNGEON_TIP_CLICK = "Click: show in the Loot Finder · Right-click: shopping l
 L.DUNGEON_KILLED = "%s (defeated)"
 L.DUNGEON_FOLD = "Minimise / expand"
 L.DUNGEON_FOLD_TIP = "Folds the window to its title bar, which still shows how many upgrades drop here."
+L.WINGS = {
+    ["Dire Maul: East"] = "East", ["Dire Maul: West"] = "West", ["Dire Maul: North"] = "North",
+    ["Stratholme: Living"] = "Living", ["Stratholme: Undead"] = "Undead",
+    ["Scarlet Monastery: Graveyard"] = "Graveyard", ["Scarlet Monastery: Library"] = "Library",
+    ["Scarlet Monastery: Armory"] = "Armory", ["Scarlet Monastery: Cathedral"] = "Cathedral",
+    ["Lower Blackrock Spire"] = "Lower", ["Upper Blackrock Spire"] = "Upper",
+}
