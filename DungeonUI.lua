@@ -283,8 +283,22 @@ local function save()
     db.h = math.floor(frame:GetHeight() + 0.5)
 end
 
+-- Minimised: the title bar alone (store().min, kept across sessions and dungeons).
+local function folded() return store().min == true end
+
+local function applyFold()
+    local open = not folded()
+    for i, chip in ipairs(frame.specs) do chip:SetShown(open and specAt(i) ~= nil) end
+    frame.list:SetShown(open)
+    frame.alt:SetShown(open)
+    frame.count:SetShown(open)
+    frame.grip:SetShown(open)
+    frame.fold.text:SetText(open and "–" or "+")
+end
+
 -- As high as the list, at most as the player sized it; a message has its own height.
 local function fit()
+    if folded() then return frame:SetHeight(TITLE) end
     local chrome = TOP + BOTTOM
     if #items == 0 then return frame:SetHeight(chrome + MESSAGE_H) end
     frame:SetHeight(math.max(MIN_H, math.min(store().h or DEFAULT.h, chrome + heightFrom(1))))
@@ -342,6 +356,11 @@ local function build()
     frame.close = U.closeButton(frame.bar, function() DungeonUI.Close() end)
     frame.close:SetSize(TITLE, TITLE)
     tip(frame.close, L.DUNGEON_CLOSE, L.DUNGEON_CLOSE_TIP)
+    frame.fold = U.closeButton(frame.bar, function() DungeonUI.Fold() end)
+    frame.fold:SetSize(TITLE, TITLE)
+    frame.fold:ClearAllPoints()
+    frame.fold:SetPoint("RIGHT", frame.close, "LEFT", 0, 0)
+    tip(frame.fold, L.DUNGEON_FOLD, L.DUNGEON_FOLD_TIP)
     frame.title = U.Text(frame.bar, 13, "title")
 
     frame.specs = {}
@@ -437,13 +456,22 @@ function DungeonUI.Refresh()
     for _, e in ipairs(entries) do if e.verdict == "UPGRADE" then up = up + 1 end end
 
     frame.title:SetText(here and L.DUNGEON_TITLE:format(here.name) or L.DUNGEON_TITLE_OUT)
+    -- Minimised, the title still tells how many upgrades wait here.
+    if folded() and up > 0 then frame.title:SetText(frame.title:GetText() .. ("  (%d)"):format(up)) end
     frame.list.message:SetText(message(here, entries))
     frame.list.caption.text:SetText(L.FILTER_ALTERNATIVES)
     frame.count:SetText(#entries > 0 and countText(up, #entries - up) or "")
     for _, chip in ipairs(frame.specs) do U.paintChip(chip) end
     U.paintChip(frame.alt)
+    applyFold()
     if not sizing then fit() end
     draw()
+end
+
+-- Minimise to the title bar, or open again.
+function DungeonUI.Fold()
+    store().min = not folded() or nil
+    DungeonUI.Refresh()
 end
 
 -- The theme's art, fonts and colours; the labels in the language.
@@ -453,7 +481,7 @@ function DungeonUI.Restyle()
     ns.ThemeArt.StyleWindow(frame, frame.bar)
     frame.title:ClearAllPoints()
     frame.title:SetPoint("LEFT", frame.bar, "LEFT", ns.ThemeArt.TextStart(TITLE) or PAD, 0)
-    frame.title:SetPoint("RIGHT", frame.close, "LEFT", 0, 0)
+    frame.title:SetPoint("RIGHT", frame.fold, "LEFT", 0, 0)
     local m = U.colour("muted")
     frame.list.caption.rule:SetVertexColor(m[1], m[2], m[3], 0.35)
     layoutSpecs()

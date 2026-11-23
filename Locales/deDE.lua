@@ -416,3 +416,5 @@ L.DUNGEON_TIP_UP = "%+d Punkte als %s gegenüber dem, was du trägst oder in den
 L.DUNGEON_TIP_ALT = "Eine Alternative: nicht klar besser als das, was du trägst oder in den Taschen hast."
 L.DUNGEON_TIP_CLICK = "Klick: im Loot Finder zeigen · Rechtsklick: Einkaufsliste"
 L.DUNGEON_KILLED = "%s (besiegt)"
+L.DUNGEON_FOLD = "Minimieren / aufklappen"
+L.DUNGEON_FOLD_TIP = "Klappt das Fenster auf die Titelzeile zusammen; sie zeigt weiter, wie viele Upgrades hier droppen."

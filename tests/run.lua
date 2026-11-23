@@ -1425,6 +1425,18 @@ do
     check("after combat: loading", win.list.message:GetText(), LL.LOADING_TABLES)
     settle()
     check("loaded: the rows", Source.Ready() and win.list.rows[1]:IsShown(), true)
+
+    -- Minimised: the title bar alone, with the count; kept for the next dungeon.
+    local openH = win:GetHeight()
+    click(win.fold)
+    check("minimised: the title bar alone", win:GetHeight() < openH and not win.list:IsShown()
+        and not win.alt:IsShown() and not win.specs[1]:IsShown(), true)
+    check("minimised: the title counts the upgrades", win.title:GetText():find("%(%d+%)$") ~= nil, true)
+    enter(nil)
+    enter(DM)
+    check("minimised: stays so in the next dungeon", DUI.IsShown() and not win.list:IsShown(), true)
+    click(win.fold)
+    check("expanded: the list again", win.list:IsShown() and win.specs[1]:IsShown() and win:GetHeight() == openH, true)
     enter(nil)
     ns.DB().dungeonWindow = nil
 end
