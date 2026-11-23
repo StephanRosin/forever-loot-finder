@@ -1032,9 +1032,10 @@ end
 
 -- Fonts, colours and art from the theme.
 function Window.Restyle()
-    -- The sticky note and the add dialog follow the theme with the window never opened.
+    -- The sticky note, the add dialog and the dungeon window follow the theme with the window never opened.
     for _, t in ipairs(texts) do styleText(t) end
     ns.ShoppingUI.Restyle()
+    ns.DungeonUI.Restyle()
     if not frame then return end
     ns.ThemeArt.StyleWindow(frame, frame.bar)
     frame.title:ClearAllPoints()

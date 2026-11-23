@@ -42,19 +42,21 @@ end
 
 -- The weakest of the worn items with stats for a role; true third when all
 -- worn are effects only (an on-use trinket: nothing is surely better).
+-- With the bags (list.need = the slot's places): the need-th best of all
+-- owned, what would be worn there after the best were put on.
 local function weakest(role, wornList, class)
+    local need = wornList.need
     -- An empty ring or trinket slot: anything fills it.
-    if wornList.empty then return 0, 0, false, nil end
-    local bestP, bestM, bestItem, unclear
+    if (wornList.empty and not need) or (need and #wornList < need) then return 0, 0, false, nil end
+    local scored, unclear = {}, false
     for _, worn in ipairs(wornList) do
         local p, m, effectOnly = wornFor(role, worn, class)
-        if effectOnly then
-            unclear = true
-        elseif not bestP or p < bestP then
-            bestP, bestM, bestItem = p, m, worn
-        end
+        if effectOnly then unclear = true else scored[#scored + 1] = { p = p, m = m, item = worn } end
     end
-    return bestP or 0, bestM or 0, unclear and not bestP, bestItem or wornList[1]
+    table.sort(scored, function(a, b) return a.p > b.p end)
+    local pick = scored[need or #scored] or scored[#scored]
+    if not pick then return 0, 0, unclear, wornList[1] end
+    return pick.p, pick.m, false, pick.item
 end
 
 -- The worn item an item of `slot` is compared with for `role` (the weaker of
@@ -75,6 +77,32 @@ Filter.BothHands = bothHands
 
 local function twoHanded(item, slot)
     return slot and slot.key == "MAINHAND" and item and item.equipLoc == "INVTYPE_2HWEAPON"
+end
+
+-- The worn ones alone of a list that may hold the bags' items too.
+local function wornOnly(list)
+    local out = { empty = list.empty }
+    for _, w in ipairs(list) do if not w.bag then out[#out + 1] = w end end
+    return out
+end
+
+-- What an item of `slot` is measured against: the worn (both hands for a two-hander) and,
+-- with the bags, what is carried for that slot. A two-hander in the bags is no main hand on
+-- its own, nor a one-hander a two-hander.
+local function owned(o, item, slot)
+    local list = o.worn(slot)
+    local two = twoHanded(item, slot)
+    local worn = wornOnly(list)
+    if two then worn = bothHands(worn, wornOnly(o.worn(Rules.SLOT.OFFHAND))) end
+    if not list.need then return worn end
+    local out = { need = list.need }
+    for _, w in ipairs(worn) do out[#out + 1] = w end
+    for _, w in ipairs(list) do
+        if w.bag and (slot.key ~= "MAINHAND" or (w.equipLoc == "INVTYPE_2HWEAPON") == (two or false)) then
+            out[#out + 1] = w
+        end
+    end
+    return out
 end
 
 function Filter.Against(slot, invSlot, role, class, item)
@@ -125,8 +153,8 @@ local function evaluate(item, o, slot)
             if not any then return nil end
         end
     else
-        local wornHere = slot and o.worn and o.worn(slot)
-        if wornHere and twoHanded(item, slot) then wornHere = bothHands(wornHere, o.worn(Rules.SLOT.OFFHAND)) end
+        local wornHere = slot and o.worn and wornOnly(o.worn(slot))
+        if wornHere and twoHanded(item, slot) then wornHere = bothHands(wornHere, wornOnly(o.worn(Rules.SLOT.OFFHAND))) end
         for _, role in ipairs(Rules.ROLES) do
             -- Warriors and paladins tank with a shield: no two-handers (bears may).
             local twoHandTank = role == "TANK" and item.equipLoc == "INVTYPE_2HWEAPON" and o.class ~= "DRUID"
@@ -149,11 +177,14 @@ local function evaluate(item, o, slot)
     for _, worn in ipairs(Filter.WornIn(slot)) do
         if worn.id == item.id then return nil end
     end
+    -- Nor what is in the bags.
+    for _, w in ipairs(o.bags and o.worn(slot) or {}) do
+        if w.id == item.id then return nil end
+    end
     if entry.unclear then
         entry.verdict = "ALT"
     else
-        local wornList = o.worn(slot)
-        if twoHanded(item, slot) then wornList = bothHands(wornList, o.worn(Rules.SLOT.OFFHAND)) end
+        local wornList = owned(o, item, slot)
         -- A one-hander or off hand beside a worn two-hander: half a pair, at best an alternative.
         local halfPair = (slot.key == "MAINHAND" or slot.key == "OFFHAND") and item.equipLoc ~= "INVTYPE_2HWEAPON"
             and (o.worn(Rules.SLOT.MAINHAND)[1] or {}).equipLoc == "INVTYPE_2HWEAPON"
@@ -312,11 +343,29 @@ function Filter.Options(over)
         now = S("filterNow"), bestArmor = S("filterBestArmor"), dungeons = S("filterDungeons"),
         raids = S("filterRaids"), quests = S("filterQuests"), crafting = S("filterCrafting"), world = S("filterWorld"), vendors = S("filterVendors"), faction = UnitFactionGroup("player"), better = S("filterBetter"), alternatives = S("filterAlternatives"), tankHit = S("filterTankHit"),
         sort = S("sort"), text = "",
+        bags = true,   -- "better": against what is worn and what is carried in the bags
         -- Only the bosses of the dungeon or raid the player is in.
         here = S("filterHere") and ns.Source.Here() or nil,
     }
     for k, v in pairs(over or {}) do o[k] = v end
     local invSlot = o.invSlot
+    if not o.worn and o.bags then
+        -- With the bags: what is carried for the slot joins the worn (Filter.Run keeps it per slot).
+        local carried
+        o.worn = function(slot)
+            local list = Filter.WornIn(slot, invSlot)
+            list.need = invSlot and 1 or #slot.inv
+            carried = carried or Items.InBags()
+            for _, item in ipairs(carried) do
+                if item.loaded and Rules.InSlot(slot, item.equipLoc, o.class)
+                    and Rules.CanWear(o.class, item.classID, item.subClassID, item.equipLoc, o.level)
+                    and (item.reqLevel or 0) <= o.level and Items.ForClass(item, o.class) then
+                    list[#list + 1] = setmetatable({ bag = true }, { __index = item })
+                end
+            end
+            return list
+        end
+    end
     o.worn = o.worn or function(slot) return Filter.WornIn(slot, invSlot) end
     return o
 end

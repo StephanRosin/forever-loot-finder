@@ -275,6 +275,14 @@ function GetInventoryItemLink(_, slot)
     local id = M.state.worn[slot]
     return id and ("|Hitem:" .. id .. "|h[x]|h") or nil
 end
+-- The bags: M.state.carried = { itemID, ... } in the backpack.
+C_Container = {
+    GetContainerNumSlots = function(bag) return bag == 0 and #(M.state.carried or {}) or 0 end,
+    GetContainerItemLink = function(bag, slot)
+        local id = bag == 0 and (M.state.carried or {})[slot]
+        return id and ("|Hitem:" .. id .. "|h[x]|h") or nil
+    end,
+}
 function IsModifiedClick() return false end
 function HandleModifiedItemClick(link) M.linked = link end
 C_Map = { GetAreaInfo = function(id) return "Area" .. id end,

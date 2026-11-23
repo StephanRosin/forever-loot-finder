@@ -190,9 +190,9 @@ function Items.NoData(item)
     return item.failed == true or (at ~= nil and GetTime() - at >= Items.WAIT)
 end
 
--- What is worn in an inventory slot, nil when empty.
-function Items.Worn(invSlot)
-    local link = GetInventoryItemLink and GetInventoryItemLink("player", invSlot)
+-- An owned item from its link (worn or in the bags), with the stats its
+-- link carries (enchants); nil for an id the client does not know.
+local function owned(link, invSlot)
     local id = link and tonumber(link:match("item:(%d+)"))
     if not id then return nil end
     local item = Items.Get(id)
@@ -206,6 +206,25 @@ function Items.Worn(invSlot)
         return worn
     end
     return item
+end
+
+-- What is worn in an inventory slot, nil when empty.
+function Items.Worn(invSlot)
+    return owned(GetInventoryItemLink and GetInventoryItemLink("player", invSlot), invSlot)
+end
+
+-- What can be worn of the bags' contents (backpack and bags), as Items.Worn gives it.
+-- shortcut: a one-hander in the bags counts its DPS as a main hand's, also against off hands.
+function Items.InBags()
+    local C, list = C_Container, {}
+    if not (C and C.GetContainerNumSlots and C.GetContainerItemLink) then return list end
+    for bag = 0, NUM_BAG_SLOTS or 4 do
+        for slot = 1, C.GetContainerNumSlots(bag) or 0 do
+            local item = owned(C.GetContainerItemLink(bag, slot))
+            if item and item.equipLoc and item.equipLoc ~= "" then list[#list + 1] = item end
+        end
+    end
+    return list
 end
 
 -- A loaded item without stats read again (Forever's new crafts get them later), at most every

@@ -31,6 +31,9 @@ Settings.DEFAULTS = {
     filterBetter = false,       -- only better than (or alternatives to) what is worn
     filterAlternatives = true,  -- with "better": the unclear ones too
     sort = "POINTS",            -- Filter.SORTS
+    -- The window on entering a dungeon or raid (DungeonUI.lua).
+    dungeonUpgrades = true,     -- opens by itself
+    dungeonAlternatives = false,
     advanced = false,           -- options: the page with the point weights
     dynamic = true,             -- hit and crit weighed from the character (Rules.ReadChar)
 }

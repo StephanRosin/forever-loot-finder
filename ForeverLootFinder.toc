@@ -29,9 +29,11 @@ QuestRewards.lua
 Shopping.lua
 Source.lua
 Filter.lua
+DungeonUpgrades.lua
 Window.lua
 Panel.lua
 ShoppingUI.lua
+DungeonUI.lua
 CharButtons.lua
 MinimapButton.lua
 Options\Widgets.lua

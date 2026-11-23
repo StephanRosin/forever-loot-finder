@@ -428,6 +428,46 @@ check("verdict: equal points alternative", Filter.Verdict(10, nil, 10, 0), "ALT"
 check("verdict: clearly fewer dropped", Filter.Verdict(5, nil, 10, 0), nil)
 check("verdict: more but less main", Filter.Verdict(20, 5, 10, 8), "ALT")
 
+section("Owned: worn and in the bags")
+Settings.SetSpec("HOLY")
+M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
+M.state.carried = { 113 }
+got = ids(run({ slot = "CHEST", better = true, bags = true }))
+check("carried: not listed itself", got[113], nil)
+check("carried better than worn: the worn's upgrade is none", got[110], nil)
+check("without the bags: still an upgrade", ids(run({ slot = "CHEST", better = true, bags = false }))[113].verdict, "UPGRADE")
+check("the main list counts the bags too", ids(run({ slot = "CHEST", better = true }))[113], nil)
+M.state.carried = { 104 }
+M.state.worn = { [13] = 106, [14] = 114 }
+got = ids(run({ slot = "CHEST", better = true, bags = true }))
+check("empty chest, robe in the bags: compared with it", got[113] and math.floor(got[113].delta + 0.5), 7)
+M.state.carried = { 101 }
+M.state.worn = {}
+got = ids(run({ slot = "FINGER", better = true, bags = true }))
+check("one ring carried, two places: still all upgrades", got[102] and got[102].verdict, "UPGRADE")
+M.state.carried = nil
+Settings.SetSpec("DISC")
+
+section("Upgrades this dungeon")
+M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
+local DU = ns.DungeonUpgrades
+check("outside: nothing, no instance", select(2, DU.List(false)), nil)
+M.state.instance = { name = "The Deadmines", kind = "party", id = 36 }
+local list, here = DU.List(true)
+check("inside: the instance", here and here.id, 36)
+check("inside: something listed", #list > 0, true)
+local allHere, sorted = true, true
+for i, e in ipairs(list) do
+    allHere = allHere and #e.drops > 0 and e.drops[1].boss ~= nil
+    if i > 1 and list[i - 1].verdict == "ALT" and e.verdict == "UPGRADE" then sorted = false end
+end
+check("only drops of here, with their boss", allHere, true)
+check("upgrades before alternatives", sorted, true)
+local none = true
+for _, e in ipairs(DU.List(false)) do none = none and e.verdict == "UPGRADE" end
+check("without alternatives: upgrades only", none, true)
+M.state.instance = nil
+
 section("One role at a time")
 -- Specs: the role stored before them picks the first spec of it; a chosen spec replaces it.
 do
@@ -1233,6 +1273,135 @@ do
     for _, e in ipairs(Shop.Entries()) do Shop.Remove(e.itemID) end
     ns.Window.ShowTab("loot")
     check("tab: loot again", win.body:IsShown(), true)
+end
+
+-- The dungeon window (DungeonUI.lua) --------------------------------------------
+section("Dungeon window")
+do
+    local DUI, LL = ns.DungeonUI, ns.L
+    local DM = { name = "The Deadmines", kind = "party", id = 36 }
+    local MC = { name = "Molten Core", kind = "raid", id = 409 }
+    local function click(b, button) b:GetScript("OnClick")(b, button or "LeftButton") end
+    local function settle()
+        for _ = 1, 200 do
+            if #M.timers == 0 then break end
+            M.RunTimers()
+        end
+    end
+    local function enter(instance)
+        M.state.instance = instance
+        M.Fire("PLAYER_ENTERING_WORLD")
+        settle()
+    end
+    M.state.worn, M.state.carried, M.state.class = {}, nil, "PRIEST"
+    Settings.SetSpec("DISC")
+    enter(nil)
+    check("outside: not opened", DUI.IsShown(), false)
+    enter(DM)
+    local win = DUI.Frame()
+    check("entering: opens by itself", DUI.IsShown(), true)
+    check("title names the instance", win.title:GetText(), LL.DUNGEON_TITLE:format("The Deadmines"))
+    local row = win.list.rows[1]
+    check("a row per upgrade", row and row:IsShown(), true)
+    check("row: the item's icon", row.icon._texture ~= nil, true)
+    check("row: slot and boss", row.where:GetText():find(LL["SLOT_" .. row.entry.slot.key] .. " · Cookie", 1, true) ~= nil, true)
+    check("row: points over the owned", row.delta:GetText(), ("%+d"):format(math.floor(row.entry.delta + 0.5)))
+    check("upgrades only: no caption", win.list.caption:IsShown(), false)
+    check("count in the footer", win.count:GetText():find("%d") ~= nil, true)
+    check("as high as its list: nothing to scroll", win.list.thumb:IsShown(), false)
+    ns.DB().dungeonWindow.h = 140   -- sized smaller than the list
+    DUI.Refresh()
+    check("smaller than its list: scrolls", win.list.thumb:IsShown(), true)
+    ns.DB().dungeonWindow.h = nil
+    check("hover: the tooltip builds", pcall(row:GetScript("OnEnter"), row), true)
+    local modified = IsModifiedClick
+    IsModifiedClick = function() return true end
+    M.linked = nil
+    click(row)
+    IsModifiedClick = modified
+    check("shift-click links the item", M.linked, row.entry.item.link)
+    click(row)
+    check("click: the finder on its slot", ns.Window.IsShown() and ns.Window.State().slot, row.entry.slot.key)
+    ns.Window.State().slot = nil
+    Settings.Set("filterBetter", false)
+
+    -- The spec, in the window.
+    click(win.specs[2])
+    check("spec chip sets the spec", Rules.SpecOf("PRIEST").id, Rules.SPECS.PRIEST[2].id)
+    M.state.class = "WARRIOR"
+    DUI.Restyle()
+    for i, spec in ipairs(Rules.SPECS.WARRIOR) do
+        if spec.role == "TANK" then click(win.specs[i]) end
+    end
+    check("tank spec: best armour on, as in the finder", Settings.Get("filterBestArmor"), true)
+    Settings.Set("filterBestArmor", false)
+    M.state.class = "PRIEST"
+    Settings.SetSpec("DISC")
+    DUI.Restyle()
+
+    -- The alternatives under their caption (Molten Core drops trinkets with an effect only: unclear).
+    M.state.worn = { [5] = 104, [13] = 106, [14] = 114 }
+    enter(MC)
+    check("another instance: its title", win.title:GetText(), LL.DUNGEON_TITLE:format("Molten Core"))
+    check("alternatives off: none listed", win.list.caption:IsShown(), false)
+    click(win.alt)
+    local hasAlt = false
+    for _, e in ipairs(ns.DungeonUpgrades.List(true)) do hasAlt = hasAlt or e.verdict == "ALT" end
+    check("the switch is the setting", Settings.Get("dungeonAlternatives") and hasAlt, true)
+    win.list:GetScript("OnMouseWheel")(win.list, -100)   -- they come last: to the list's end
+    check("alternatives under their caption", win.list.caption:IsShown(), true)
+    local last
+    for _, r in ipairs(win.list.rows) do if r:IsShown() then last = r end end
+    check("scrolled to the end: the last row is an alternative", last.entry.verdict, "ALT")
+    click(win.alt)
+    M.state.worn = {}
+
+    -- Closed by hand: away until another instance.
+    click(win.close)
+    check("closed by hand", DUI.IsShown(), false)
+    enter(nil)
+    enter(MC)
+    check("the same instance again: stays closed", DUI.IsShown(), false)
+    enter(DM)
+    check("another instance: opens again", DUI.IsShown(), true)
+    enter(nil)
+    check("leaving: hidden", DUI.IsShown(), false)
+    Settings.Set("dungeonUpgrades", false)
+    enter(DM)
+    check("setting off: does not open", DUI.IsShown(), false)
+    SlashCmdList.FOREVERLOOTFINDER("dungeon")
+    check("/flf dungeon opens it", DUI.IsShown(), true)
+    SlashCmdList.FOREVERLOOTFINDER("dungeon")
+    check("/flf dungeon closes it", DUI.IsShown(), false)
+    Settings.Set("dungeonUpgrades", true)
+
+    -- Nothing to list, and outside.
+    enter(nil)
+    enter({ name = "Nowhere Keep", kind = "party", id = 999 })
+    local text = win.list.message:GetText()
+    check("nothing drops: says so for the spec", text:find(LL.DUNGEON_EMPTY:format(LL.SPEC_PRIEST_DISC), 1, true) ~= nil, true)
+    check("nothing drops: points at the alternatives", text:find(LL.DUNGEON_EMPTY_HINT, 1, true) ~= nil, true)
+    check("nothing drops: no rows", win.list.rows[1]:IsShown(), false)
+    enter(nil)
+    DUI.Show()
+    check("outside, opened by hand: says so", win.list.message:GetText(), LL.DUNGEON_OUTSIDE)
+    DUI.Close()
+
+    -- The loot tables: not in combat, then by themselves (the finder would read them at once).
+    ns.Window.Frame():Hide()
+    Source.Reset()
+    M.timers = {}
+    M.state.combat = true
+    enter(DM)
+    check("in combat: says the tables wait", win.list.message:GetText(), LL.SOURCE_COMBAT)
+    check("in combat: nothing loaded", Source.Ready(), false)
+    M.state.combat = false
+    M.Fire("PLAYER_REGEN_ENABLED")
+    check("after combat: loading", win.list.message:GetText(), LL.LOADING_TABLES)
+    settle()
+    check("loaded: the rows", Source.Ready() and win.list.rows[1]:IsShown(), true)
+    enter(nil)
+    ns.DB().dungeonWindow = nil
 end
 
 print(("%d passed, %d failed"):format(pass, fail))
