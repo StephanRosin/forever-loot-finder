@@ -22,6 +22,7 @@ local Lib = LibForeverThemes
 -- Wide enough for the widest theme and language (Console, Frost in German: 744 measured).
 local WIDTH, HEIGHT, TITLE_H, PAD = 780, 640, 32, 12
 local CHIP_H, CHIP_GAP, SLOT_SIZE = 22, 6, 32
+local LABEL_W = 62   -- the row names (Class:, Sources:, Filters:) left of the chips
 local ROW_H, ROW_GAP, DETAIL_LINE, ICON = 44, 4, 16, 34
 -- Right edges of the row's columns (item level, points, verdict, main value), from the row's
 -- right; the headers above use the same. Rows end SCROLL_W short of the list (the scroll thumb).
@@ -158,13 +159,17 @@ Window.UI = { Text = Text, colour = colour, paintText = paintText, fill = fill, 
 -- ---------------------------------------------------------------------------
 local chips = {}
 
+-- A menu chip (the class) opens a list: never "on", an arrow instead. A segment (a spec) is one
+-- of several: the others read as choosable, not as switched off.
 local function paintChip(chip)
-    local on = chip.get()
+    local on = chip.get() and not chip.menu
     local a = colour("accent")
     chip.fill:SetVertexColor(a[1], a[2], a[3], on and 0.2 or 0)
-    paintEdges(chip.edges, on and a or colour("muted"), on and 0.9 or 0.45)
-    paintText(chip.text, on and "text" or "muted")
+    paintEdges(chip.edges, on and a or colour("muted"), (on or chip.menu or chip.segment) and 0.9 or 0.45)
+    if not chip.menu then paintText(chip.text, (on or chip.segment) and "text" or "muted") end
     chip.tick:SetShown(on and not chip.dot)
+    if chip.arrow then local m = colour("muted"); chip.arrow:SetVertexColor(m[1], m[2], m[3], 1) end
+    if chip.segment then chip:SetFrameLevel(chip:GetParent():GetFrameLevel() + (on and 2 or 1)) end   -- its edge on top
 end
 
 local function Chip(parent, label, get, set, opts)
@@ -178,12 +183,21 @@ local function Chip(parent, label, get, set, opts)
     chip.tick:SetPoint("LEFT", chip, "LEFT", 3, 0)
     chip.tick:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
     chip.text = Text(chip, 12, "text", false)
-    chip.text:SetPoint("LEFT", chip, "LEFT", (opts and opts.dot) and 8 or 20, 0)
+    chip.text:SetPoint("LEFT", chip, "LEFT", (opts and (opts.dot or opts.segment or opts.menu)) and 8 or 20, 0)
     chip.label, chip.get, chip.set = label, get, set
-    chip.dot = opts and opts.dot
+    chip.dot = opts and (opts.dot or opts.segment or opts.menu)
+    chip.segment, chip.menu = opts and opts.segment, opts and opts.menu
+    if chip.menu then
+        chip.arrow = chip:CreateTexture(nil, "ARTWORK")
+        chip.arrow:SetAtlas("friendslist-categorybutton-arrow-down")
+        chip.arrow:SetSize(10, 10)
+        chip.arrow:SetPoint("RIGHT", chip, "RIGHT", -6, 0)
+    end
     function chip:Relabel()
         self.text:SetText(type(self.label) == "function" and self.label() or self.label)
-        self:SetWidth(math.max(48, math.floor((self.text:GetStringWidth() or 40) + (self.dot and 18 or 30))))
+        self.text:SetWidth(0)
+        self:SetWidth(math.max(48, math.floor((self.text:GetStringWidth() or 40) + (self.dot and 18 or 30)
+            + (self.menu and 14 or 0))))
     end
     chip:Relabel()
     chip:SetScript("OnClick", function(self)
@@ -197,16 +211,19 @@ end
 Window.UI.Chip, Window.UI.paintChip = Chip, paintChip
 
 -- Lays chips out from x along a row.
-local function flow(list, parent, x, y)
+local function flow(list, parent, x, y, gap)
     for _, chip in ipairs(list) do
         if chip:IsShown() then
             chip:ClearAllPoints()
             chip:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-            x = x + chip:GetWidth() + CHIP_GAP
+            x = x + chip:GetWidth() + (gap or CHIP_GAP)
         end
     end
     return x
 end
+
+-- The rows under the title: y of row i (1 class, 2 sources, 3 filters).
+local function rowY(i) return -(TITLE_H + 10 + (i - 1) * (CHIP_H + 8)) end
 
 -- ---------------------------------------------------------------------------
 -- The class menu
@@ -241,7 +258,7 @@ local function filterRow()
     -- Cloth wearers have one armour type: "best armour only" would change nothing.
     frame.armorChip:SetShown(Rules.HasArmorChoice(currentClass()))
     frame.hitChip:SetShown(roles().TANK == true)
-    flow(frame.filterChips, frame, PAD, -(TITLE_H + 10 + 2 * (CHIP_H + 8)))
+    flow(frame.filterChips, frame, PAD + LABEL_W, rowY(3))
 end
 
 -- A spec chip picks its spec; the picked one stays (one at a time).
@@ -707,8 +724,13 @@ local function build()
     frame.shop = ns.ShoppingUI.BuildPanel(frame)
 
     -- Row 1: class, specs, search.
+    frame.rowNames = {}
+    for i = 1, 3 do
+        frame.rowNames[i] = Text(body, 11, "muted")
+        frame.rowNames[i]:SetPoint("LEFT", frame, "TOPLEFT", PAD, rowY(i) - CHIP_H / 2)
+    end
     frame.classChip = Chip(body, function() return className(currentClass()) end, function() return true end, nil,
-        { dot = true })
+        { menu = true })
     frame.classChip:SetScript("OnClick", function()
         frame.classMenu:SetShown(not frame.classMenu:IsShown())
     end)
@@ -719,7 +741,7 @@ local function build()
         frame.specChips[i] = Chip(body,
             function() local s = specAt(i); return s and L[Rules.SpecLabelKey(currentClass(), s)] or "" end,
             function() local s = specAt(i); return s ~= nil and Rules.SpecOf(currentClass()).id == s.id end,
-            function(v) local s = specAt(i); if s then setSpec(s, v) end end)
+            function(v) local s = specAt(i); if s then setSpec(s, v) end end, { segment = true })
     end
     local box = CreateFrame("EditBox", "ForeverLootFinderSearch", body)
     box:SetSize(170, CHIP_H)
@@ -835,16 +857,20 @@ function Window.Relayout()
     local class = currentClass()
     frame.classChip:Relabel()
     paintText(frame.classChip.text, nil, classColor(class))
-    local row1 = { frame.classChip }
+    local x = flow({ frame.classChip }, frame, PAD + LABEL_W, rowY(1)) + 6
     for i, chip in ipairs(frame.specChips) do
         chip:SetShown(specAt(i) ~= nil)
         chip:Relabel()
-        row1[#row1 + 1] = chip
     end
-    flow(row1, frame, PAD, -(TITLE_H + 10))
+    flow(frame.specChips, frame, x, rowY(1), -1)   -- the specs as one bar: shared edges
     frame.hereChip:SetShown(ns.Source.Here() ~= nil)
     frame.hereChip:Relabel()
-    flow(frame.sourceChips, frame, PAD, -(TITLE_H + 10 + CHIP_H + 8))
+    local right = flow(frame.sourceChips, frame, PAD + LABEL_W, rowY(2)) - CHIP_GAP
+    if right > WIDTH - PAD then   -- a long dungeon name: cut it at the window's edge
+        local w = frame.hereChip:GetWidth() - (right - (WIDTH - PAD))
+        frame.hereChip:SetWidth(w)
+        frame.hereChip.text:SetWidth(w - 26)
+    end
     filterRow()
     Window.Update()
 end
@@ -1017,6 +1043,7 @@ function Window.Restyle()
     paintEdges(frame.classMenu.edges, colour("accent"), 0.8)
     for _, chip in ipairs(chips) do chip:Relabel() end
     frame.search.hint:SetText(L.SEARCH)
+    for i, key in ipairs({ "ROW_CLASS", "ROW_SOURCES", "ROW_FILTERS" }) do frame.rowNames[i]:SetText(L[key]) end
     ns.Panel.Restyle()
     Window.Relayout()
 end
